@@ -1,8 +1,16 @@
 #!/bin/bash
 
 LOG_FILE="/var/log/backup_runner.log"
-ZABBIX_SERVER="10.10.10.10"  # Burayı kendi Zabbix Server IP veya domaini ile değiştir
-HOSTNAME="Database-Master"  # Zabbix'te kayıtlı olan hostname
+ENV_FILE="/root/.backup_env"
+
+# Env dosyasını kontrol et
+if [ ! -f "$ENV_FILE" ]; then
+    echo "HATA: Env dosyası bulunamadı: $ENV_FILE"
+    exit 1
+fi
+
+# Env dosyasını yükle
+source "$ENV_FILE"
 
 send_to_zabbix() {
     MESSAGE=$1

@@ -1,12 +1,16 @@
 #!/bin/bash
 
 LOG_FILE="/var/log/backup_verify.log"
-BACKUP_DIR="/home/pg_backup/backup"
-ZABBIX_SERVER="10.10.10.10"
-HOSTNAME="Database-Master"
-TEST_DB_NAME="verify_test_db"
-# Checksum dizini tanımı
-CHECKSUM_DIR="${BACKUP_DIR}/checksums"
+ENV_FILE="/root/.backup_env"
+
+# Env dosyasını kontrol et
+if [ ! -f "$ENV_FILE" ]; then
+    echo "HATA: Env dosyası bulunamadı: $ENV_FILE"
+    exit 1
+fi
+
+# Env dosyasını yükle
+source "$ENV_FILE"
 
 # Zabbix'e bildirim gönderme fonksiyonu
 send_to_zabbix() {

@@ -1,0 +1,11 @@
+PCLOUD_USERNAME="your_username"
+PCLOUD_PASSWORD="your_password"
+
+ZABBIX_SERVER="10.10.10.10"
+HOSTNAME="Database-Master"
+
+BACKUP_DIR="/home/pg_backup/backup"
+
+TEST_DB_NAME="verify_test_db"
+
+CHECKSUM_DIR="${BACKUP_DIR}/checksums"
