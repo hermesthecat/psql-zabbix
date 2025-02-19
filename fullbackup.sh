@@ -2,7 +2,7 @@
 
 LOG_FILE="/var/log/backup_runner.log"
 ZABBIX_SERVER="10.10.10.10"  # Burayı kendi Zabbix Server IP veya domaini ile değiştir
-HOSTNAME="Database-Master"  # Zabbix’te kayıtlı olan hostname
+HOSTNAME="Database-Master"  # Zabbix'te kayıtlı olan hostname
 
 send_to_zabbix() {
     MESSAGE=$1
@@ -38,6 +38,7 @@ run_step() {
 run_step "PostgreSQL Backup" "/root/pgbackup.sh"
 run_step "Archiving Backup" "/root/tar.sh"
 run_step "Uploading Backup" "/root/upload.sh"
+run_step "Verifying Backup" "/root/verify_backup.sh"
 
 FINAL_MSG="$(date '+%Y-%m-%d %H:%M:%S') - SUCCESS: Backup process completed!"
 echo "$FINAL_MSG" >> "$LOG_FILE"
