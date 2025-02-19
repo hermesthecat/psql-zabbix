@@ -7,11 +7,13 @@ Bu proje, PostgreSQL veritabanlarının otomatik yedeklenmesi, sıkıştırılma
 - Otomatik PostgreSQL yedekleme
 - Günlük, haftalık ve aylık yedek rotasyonu
 - Yedeklerin sıkıştırılması (bzip2/gzip)
+- AES-256-CBC şifreleme ile güvenli yedekleme
 - Uzak sunucuya yedek yükleme
 - pCloud entegrasyonu
 - Kapsamlı yedek doğrulama sistemi:
   - MD5 ve SHA256 checksum kontrolü
   - Arşiv bütünlüğü testi
+  - Şifreleme doğrulama testi
   - Test veritabanında restore denemesi
 - Zabbix entegrasyonu ile monitoring
 - Merkezi yapılandırma yönetimi
@@ -31,6 +33,7 @@ Bu proje, PostgreSQL veritabanlarının otomatik yedeklenmesi, sıkıştırılma
 - **/.backup_env**: Merkezi yapılandırma dosyası
 - **/.pgpass**: PostgreSQL kimlik bilgileri
 - **/.pcloud_credentials**: pCloud kimlik bilgileri (opsiyonel)
+- **/.backup_encryption_key**: AES şifreleme anahtarı (otomatik oluşturulur)
 
 ### Log Dosyaları
 - **/var/log/backup_runner.log**: Ana yedekleme logları
@@ -80,6 +83,12 @@ echo "localhost:5432:*:postgres:your_password" > ~/.pgpass
 chmod 600 ~/.pgpass
 ```
 
+5. Şifreleme anahtarı otomatik olarak oluşturulacaktır:
+   - İlk çalıştırmada `/root/.backup_encryption_key` dosyası oluşturulur
+   - 32 byte'lık rastgele AES-256 anahtarı üretilir
+   - Dosya izinleri 600 olarak ayarlanır (sadece root okuyabilir)
+   - **ÖNEMLİ**: Bu anahtarı güvenli bir yerde yedeklemeyi unutmayın!
+
 ## Kullanım
 
 ### Manuel Çalıştırma
@@ -117,10 +126,11 @@ chmod 600 ~/.pgpass
 
 3. **Sıkıştırma Metrikleri** (backup.tar):
    - Orijinal boyut (MB)
-   - Sıkıştırılmış boyut (MB)
+   - Şifrelenmiş boyut (MB)
    - Sıkıştırma oranı (%)
    - İşlem hızı (MB/s)
    - İşlem süresi (s)
+   - Şifreleme durumu
 
 4. **pCloud Metrikleri** (pcloud.upload):
    - Yükleme boyutu (MB)
@@ -172,7 +182,7 @@ Priority: High
 Description: Test veritabanına restore işlemi başarısız oldu.
 ```
 
-3. **Sıkıştırma Performans Alarmları**:
+3. **Sıkıştırma ve Şifreleme Performans Alarmları**:
 ```
 # Düşük sıkıştırma oranı
 Name: Low Compression Ratio on {HOST.NAME}
@@ -180,23 +190,29 @@ Expression: {HOST.NAME:backup.tar.compression_ratio.last()}<30
 Priority: Warning
 Description: Sıkıştırma oranı %30'un altında. Yedek dosyaları beklenenden büyük olabilir.
 
-# Düşük sıkıştırma hızı
-Name: Slow Compression Speed on {HOST.NAME}
+# Düşük işlem hızı
+Name: Slow Encryption Speed on {HOST.NAME}
 Expression: {HOST.NAME:backup.tar.speed.last()}<5
 Priority: Warning
-Description: Sıkıştırma hızı 5MB/s'nin altında. Sistem performans sorunu olabilir.
+Description: Şifreleme ve sıkıştırma hızı 5MB/s'nin altında. Sistem performans sorunu olabilir.
 
-# Uzun sıkıştırma süresi
-Name: Compression Taking Too Long on {HOST.NAME}
+# Uzun işlem süresi
+Name: Encryption Taking Too Long on {HOST.NAME}
 Expression: {HOST.NAME:backup.tar.duration.last()}>1800
 Priority: Warning
-Description: Sıkıştırma işlemi 30 dakikadan uzun sürdü.
+Description: Şifreleme ve sıkıştırma işlemi 30 dakikadan uzun sürdü.
 
-# Sıkıştırma hatası
-Name: Compression Error on {HOST.NAME}
+# Şifreleme hatası
+Name: Encryption Error on {HOST.NAME}
 Expression: {HOST.NAME:backup.tar.str("HATA")}=1
 Priority: High
-Description: Sıkıştırma işlemi sırasında hata oluştu.
+Description: Şifreleme işlemi sırasında hata oluştu.
+
+# Şifreleme doğrulama hatası
+Name: Encryption Verification Failed on {HOST.NAME}
+Expression: {HOST.NAME:backup.tar.str("şifreleme doğrulama")}=1
+Priority: High
+Description: Şifreleme doğrulama testi başarısız oldu.
 ```
 
 4. **pCloud Yükleme Alarmları**:
@@ -312,3 +328,23 @@ A. Kerem Gök
 ## Lisans
 
 Bu proje GNU General Public License v3.0 altında lisanslanmıştır. 
+
+## Yedekleri Çözme
+
+Şifrelenmiş yedekleri çözmek için aşağıdaki adımları izleyin:
+
+1. Şifre çözme:
+```bash
+openssl enc -d -aes-256-cbc -in backup_TARIH.tar.gz.enc -out backup_TARIH.tar.gz -pass file:/root/.backup_encryption_key
+```
+
+2. Arşivi açma:
+```bash
+tar -xzf backup_TARIH.tar.gz
+```
+
+**Önemli Notlar**:
+- Şifreleme anahtarını (`/root/.backup_encryption_key`) kaybederseniz, yedekleri çözemezsiniz
+- Anahtarı güvenli bir ortamda yedekleyin
+- Yedek sunucularına anahtarı da taşımayı unutmayın
+- Şifreleme nedeniyle yedekleme süresi ve dosya boyutu bir miktar artacaktır 
