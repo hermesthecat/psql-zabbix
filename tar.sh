@@ -148,8 +148,6 @@ main() {
     if [ -z "$sql_files" ]; then
         log_message "HATA: Hiç SQL yedek dosyası bulunamadı!"
         echo "HATA: Hiç SQL yedek dosyası bulunamadı!"
-        echo "Dizin içeriği:"
-        ls -la "$BACKUP_DIR"
         exit 1
     fi
 
