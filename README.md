@@ -212,7 +212,6 @@ A. Kerem Gök
 ## Lisans
 
 Bu proje GNU General Public License v3.0 altında lisanslanmıştır. 
-
 ## Yedekleri Çözme
 
 Şifrelenmiş yedekleri çözmek için aşağıdaki adımları izleyin:
