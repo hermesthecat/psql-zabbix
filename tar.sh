@@ -16,8 +16,8 @@ source "$ENV_FILE"
 
 # Şifreleme anahtarını kontrol et
 if [ ! -f "$ENCRYPTION_KEY_FILE" ]; then
-    # Rastgele 32 byte'lık anahtar oluştur (AES-256 için)
-    openssl rand -base64 32 > "$ENCRYPTION_KEY_FILE"
+    # Rastgele 32 karakterlik şifre oluştur
+    tr -dc 'A-Za-z0-9!@#$%^&*()' < /dev/urandom | head -c 32 > "$ENCRYPTION_KEY_FILE"
     chmod 600 "$ENCRYPTION_KEY_FILE"
 fi
 
@@ -55,7 +55,7 @@ calculate_compression_ratio() {
 compress_and_encrypt_backup() {
     local source_dir=$1
     local target_file=$2
-    local temp_tar="/tmp/temp_backup_$$.tar.gz"
+    local password=$(cat "$ENCRYPTION_KEY_FILE")
     local start_time=$(date +%s)
     
     # Kaynak dizin boyutunu al
@@ -63,60 +63,45 @@ compress_and_encrypt_backup() {
     log_message "Sıkıştırma ve şifreleme başlıyor: $source_dir (Boyut: ${original_size}MB)"
     send_to_zabbix "$original_size" "backup.tar.original_size"
     
-    # Önce tar.gz oluştur
-    tar -czf "$temp_tar" -C "$(dirname "$source_dir")" "$(basename "$source_dir")" 2>/dev/null
-    local tar_status=$?
+    # 7zip ile sıkıştır ve şifrele
+    7z a -t7z -m0=lzma2 -mx=9 -mfb=64 -md=32m -ms=on -mhe=on -p"$password" "$target_file" "$source_dir" >/dev/null 2>&1
+    local zip_status=$?
     
-    if [ $tar_status -eq 0 ]; then
-        # tar.gz dosyasını AES ile şifrele
-        openssl enc -aes-256-cbc -salt -in "$temp_tar" -out "$target_file" -pass file:"$ENCRYPTION_KEY_FILE" 2>/dev/null
-        local encrypt_status=$?
-        rm -f "$temp_tar"  # Geçici dosyayı sil
-        
+    if [ $zip_status -eq 0 ]; then
         # Bitiş zamanı ve süre hesaplama
         local end_time=$(date +%s)
         local duration=$((end_time - start_time))
         
-        if [ $encrypt_status -eq 0 ]; then
-            # Şifrelenmiş dosya boyutu
-            local encrypted_size=$(get_file_size "$target_file")
-            local compression_ratio=$(calculate_compression_ratio $original_size $encrypted_size)
-            local speed=$(echo "scale=2; $original_size / $duration" | bc)
-            
-            local success_msg="Sıkıştırma ve şifreleme başarılı: ${encrypted_size}MB (Oran: %${compression_ratio}, Hız: ${speed}MB/s, Süre: ${duration}s)"
-            log_message "$success_msg"
-            
-            # Metrikleri Zabbix'e gönder
-            send_to_zabbix "$encrypted_size" "backup.tar.encrypted_size"
-            send_to_zabbix "$compression_ratio" "backup.tar.compression_ratio"
-            send_to_zabbix "$speed" "backup.tar.speed"
-            send_to_zabbix "$duration" "backup.tar.duration"
-            
-            # Şifreleme doğruluğunu test et
-            local test_decrypt="/tmp/test_decrypt_$$.tar.gz"
-            openssl enc -d -aes-256-cbc -in "$target_file" -out "$test_decrypt" -pass file:"$ENCRYPTION_KEY_FILE" 2>/dev/null
-            if [ $? -eq 0 ]; then
-                tar -tzf "$test_decrypt" >/dev/null 2>&1
-                local verify_status=$?
-                rm -f "$test_decrypt"
-                
-                if [ $verify_status -eq 0 ]; then
-                    log_message "Şifreleme ve arşiv bütünlük kontrolü başarılı"
-                    return 0
-                else
-                    log_message "HATA: Arşiv bütünlük kontrolü başarısız!"
-                    return 1
-                fi
-            else
-                log_message "HATA: Şifreleme doğrulama testi başarısız!"
-                return 1
-            fi
+        # Şifrelenmiş dosya boyutu
+        local encrypted_size=$(get_file_size "$target_file")
+        local compression_ratio=$(calculate_compression_ratio $original_size $encrypted_size)
+        local speed=$(echo "scale=2; $original_size / $duration" | bc)
+        
+        local success_msg="Sıkıştırma ve şifreleme başarılı: ${encrypted_size}MB (Oran: %${compression_ratio}, Hız: ${speed}MB/s, Süre: ${duration}s)"
+        log_message "$success_msg"
+        
+        # Metrikleri Zabbix'e gönder
+        send_to_zabbix "$encrypted_size" "backup.tar.encrypted_size"
+        send_to_zabbix "$compression_ratio" "backup.tar.compression_ratio"
+        send_to_zabbix "$speed" "backup.tar.speed"
+        send_to_zabbix "$duration" "backup.tar.duration"
+        
+        # Şifreleme doğruluğunu test et
+        7z t -p"$password" "$target_file" >/dev/null 2>&1
+        local verify_status=$?
+        
+        if [ $verify_status -eq 0 ]; then
+            log_message "Yedek doğrulama başarılı: $target_file"
+            send_to_zabbix "1" "backup.tar.verify"
+            return 0
         else
-            log_message "HATA: Şifreleme işlemi başarısız! (Çıkış kodu: $encrypt_status)"
+            log_message "HATA: Yedek doğrulama başarısız: $target_file"
+            send_to_zabbix "0" "backup.tar.verify"
             return 1
         fi
     else
-        log_message "HATA: Sıkıştırma işlemi başarısız! (Çıkış kodu: $tar_status)"
+        log_message "HATA: Sıkıştırma ve şifreleme başarısız: $source_dir"
+        send_to_zabbix "0" "backup.tar.status"
         return 1
     fi
 }
