@@ -182,6 +182,9 @@ main() {
     echo "DEBUG: Tüm SQL dosyaları:" >> "$LOG_FILE"
     find "$BACKUP_DIR" -maxdepth 4 -type f -name "*.sql" -mmin -1440 >> "$LOG_FILE"
     
+    # Geçici bir dosya oluştur
+    local temp_list=$(mktemp)
+    
     while IFS= read -r sql_file; do
         echo "DEBUG: İşlenen SQL dosyası: $sql_file" >> "$LOG_FILE"
         # SQL dosyasının adından veritabanı adını çıkar
@@ -192,14 +195,16 @@ main() {
         echo "DEBUG: Zip arama pattern: backup_${db_name}_*.7z" >> "$LOG_FILE"
         if ! find "$ZIP_DIR" -maxdepth 1 -type f -name "backup_${db_name}_*.7z" -mmin -1440 | grep -q .; then
             echo "DEBUG: Zip bulunamadı, SQL dosyası listeye ekleniyor" >> "$LOG_FILE"
-            sql_files+="$(stat -c '%Y %n' "$sql_file")\n"
+            stat -c '%Y %n' "$sql_file" >> "$temp_list"
         else
             echo "DEBUG: Bu veritabanı için zaten zip var, atlanıyor" >> "$LOG_FILE"
         fi
     done < <(find "$BACKUP_DIR" -maxdepth 4 -type f -name "*.sql" -mmin -1440)
     
-    # Boşlukları temizle ve sırala
-    sql_files=$(echo -e "$sql_files" | sort -nr)
+    # Dosyaları sırala ve sql_files değişkenine aktar
+    sql_files=$(sort -nr "$temp_list")
+    rm -f "$temp_list"
+    
     echo "DEBUG: Final SQL dosyaları listesi:" >> "$LOG_FILE"
     echo "$sql_files" >> "$LOG_FILE"
     
@@ -213,9 +218,8 @@ main() {
     local total_count=0
 
     # Her SQL dosyası için ayrı işlem yap
-    local IFS=$'\n'
     echo "DEBUG: Döngü başlıyor..." >> "$LOG_FILE"
-    while read -r line; do
+    while IFS= read -r line; do
         echo "DEBUG: İşlenen satır: $line" >> "$LOG_FILE"
         local timestamp=$(echo "$line" | cut -d' ' -f1)
         local filepath=$(echo "$line" | cut -d' ' -f2-)
@@ -223,10 +227,13 @@ main() {
         
         if [ -n "$filepath" ]; then
             ((total_count++))
+            echo "DEBUG: total_count = $total_count" >> "$LOG_FILE"
             
             # SQL dosyasının boyutunu kontrol et
             local file_size=$(du -sm "$filepath" | cut -f1)
+            echo "DEBUG: file_size = $file_size MB" >> "$LOG_FILE"
             local available_space=$(df -m "$ZIP_DIR" | tail -1 | awk '{print $4}')
+            echo "DEBUG: available_space = $available_space MB" >> "$LOG_FILE"
             
             if [ $available_space -lt $file_size ]; then
                 log_message "HATA: $filepath için yeterli alan yok. Gerekli: ${file_size}MB, Mevcut: ${available_space}MB"
@@ -247,9 +254,11 @@ main() {
             mkdir -p "$temp_dir"
             cp "$filepath" "$temp_dir/"
             
+            echo "DEBUG: Sıkıştırma başlıyor - temp_dir: $temp_dir, target_file: $target_file" >> "$LOG_FILE"
             # Sıkıştırma ve şifreleme işlemini başlat
             if compress_and_encrypt_backup "$temp_dir" "$target_file" "$compression_speed"; then
                 ((success_count++))
+                echo "DEBUG: success_count = $success_count" >> "$LOG_FILE"
                 log_message "$filepath başarıyla sıkıştırıldı: $target_file"
                 echo "$filepath başarıyla sıkıştırıldı: $target_file"
             else
@@ -260,9 +269,10 @@ main() {
             # Geçici dizini temizle
             rm -rf "$temp_dir"
         fi
-    done <<< "$sql_files"
+    done < <(echo "$sql_files")
 
     # Sonuç raporu
+    echo "DEBUG: Döngü bitti - total_count: $total_count, success_count: $success_count" >> "$LOG_FILE"
     local summary="Toplam: $total_count dosya, Başarılı: $success_count, Başarısız: $((total_count - success_count))"
     log_message "$summary"
     echo "$summary"
