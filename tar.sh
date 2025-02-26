@@ -157,9 +157,9 @@ main() {
     fi
     
     # Hedef dosya adını oluştur
-    local datetime=$(date +%Y%m%d%H%M%S)
-    local backup_date=$(basename "$latest_backup" | cut -d'_' -f2)
-    local target_file="$ZIP_DIR/backup_${backup_date}_${datetime}.7z"
+    local datetime=$(date +%Y%m%d_%H%M%S)
+    local backup_name=$(basename "$latest_backup" | cut -d'/' -f2)
+    local target_file="$ZIP_DIR/backup_${backup_name}_${datetime}.7z"
     
     log_message "Yedek sıkıştırma ve şifreleme işlemi başlatılıyor..."
     echo "Yedek sıkıştırma ve şifreleme işlemi başlatılıyor..."
