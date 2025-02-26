@@ -13,6 +13,26 @@ fi
 # Env dosyasını yükle
 source "$ENV_FILE"
 
+# Kritik bağımlılıkları kontrol et
+command -v 7z >/dev/null 2>&1 || { echo "HATA: 7zip yüklü değil"; exit 1; }
+command -v zabbix_sender >/dev/null 2>&1 || { echo "HATA: zabbix-sender yüklü değil"; exit 1; }
+
+# Kritik değişkenleri kontrol et
+for var in BACKUP_DIR ZIP_DIR ZABBIX_SERVER ENCRYPTION_KEY_FILE; do
+    if [ -z "${!var}" ]; then
+        echo "HATA: $var değişkeni tanımlanmamış"
+        exit 1
+    fi
+done
+
+# Dizinlerin varlığını kontrol et
+for dir in "$BACKUP_DIR" "$ZIP_DIR"; do
+    if [ ! -d "$dir" ]; then
+        echo "HATA: $dir dizini mevcut değil"
+        exit 1
+    fi
+done
+
 # Şifreleme anahtarını kontrol et
 if [ ! -f "$ENCRYPTION_KEY_FILE" ]; then
     # Rastgele 32 karakterlik şifre oluştur
@@ -121,9 +141,25 @@ main() {
         exit 1
     fi
     
+    # Yedek dizininin yaşını kontrol et (24 saatten eski olmamalı)
+    local backup_age=$(find "$latest_backup" -maxdepth 0 -mtime +1)
+    if [ ! -z "$backup_age" ]; then
+        log_message "UYARI: En son yedek 24 saatten daha eski!"
+        echo "UYARI: En son yedek 24 saatten daha eski!"
+    fi
+    
+    # Hedef dizinde yeterli alan var mı kontrol et
+    local required_space=$(du -sm "$latest_backup" | cut -f1)
+    local available_space=$(df -m "$ZIP_DIR" | tail -1 | awk '{print $4}')
+    if [ $available_space -lt $required_space ]; then
+        log_message "HATA: Hedef dizinde yeterli alan yok. Gerekli: ${required_space}MB, Mevcut: ${available_space}MB"
+        echo "HATA: Hedef dizinde yeterli alan yok. Gerekli: ${required_space}MB, Mevcut: ${available_space}MB"
+        exit 1
+    fi
+    
     # Hedef dosya adını oluştur
     local datetime=$(date +%Y%m%d%H%M%S)
-    local backup_date=$(basename "$latest_backup" | cut -d'/' -f2)
+    local backup_date=$(basename "$latest_backup" | cut -d'_' -f2)
     local target_file="$ZIP_DIR/backup_${backup_date}_${datetime}.7z"
     
     log_message "Yedek sıkıştırma ve şifreleme işlemi başlatılıyor..."
