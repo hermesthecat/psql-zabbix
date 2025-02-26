@@ -81,7 +81,7 @@ SEPDIR=yes
 DOWEEKLY=6
 
 # Choose Compression type. (gzip or bzip2)
-COMP=bzip2
+#COMP=bzip2
 
 # Command to run before backups (uncomment to use)
 #PREBACKUP="/etc/pgsql-backup-pre"
