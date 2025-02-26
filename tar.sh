@@ -142,8 +142,8 @@ main() {
     ls -la "$BACKUP_DIR" >> "$LOG_FILE"
 
     # En son yedek dizinini bul (daha detaylı arama)
-    echo "Yedek dizini aranıyor: $BACKUP_DIR/*backup*" >> "$LOG_FILE"
-    local latest_backup=$(find "$BACKUP_DIR" -maxdepth 1 -type d -name "**" -printf '%T@ %p\n' | sort -nr | head -n1 | cut -d' ' -f2-)
+    echo "Yedek dizini aranıyor: $BACKUP_DIR" >> "$LOG_FILE"
+    local latest_backup=$(find "$BACKUP_DIR" -maxdepth 1 -type d -name "*.sql" -printf '%T@ %p\n' | sort -nr | head -n1 | cut -d' ' -f2-)
     
     if [ -z "$latest_backup" ]; then
         log_message "HATA: Sıkıştırılacak yedek dizini bulunamadı!"
