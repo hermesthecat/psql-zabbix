@@ -174,17 +174,31 @@ main() {
     # Henüz ziplenmemiş SQL dosyalarını bul
     echo "Ziplenmemiş SQL dosyaları aranıyor..." >> "$LOG_FILE"
     local sql_files=""
+    
+    echo "DEBUG: BACKUP_DIR = $BACKUP_DIR" >> "$LOG_FILE"
+    echo "DEBUG: Tüm SQL dosyaları:" >> "$LOG_FILE"
+    find "$BACKUP_DIR" -maxdepth 4 -type f -name "*.sql" -mmin -1440 >> "$LOG_FILE"
+    
     while IFS= read -r sql_file; do
+        echo "DEBUG: İşlenen SQL dosyası: $sql_file" >> "$LOG_FILE"
         # SQL dosyasının adından veritabanı adını çıkar
         local db_name=$(basename "$sql_file" .sql)
+        echo "DEBUG: Veritabanı adı: $db_name" >> "$LOG_FILE"
+        
         # Son 24 saat içinde bu veritabanı için zip yapılmış mı kontrol et
+        echo "DEBUG: Zip arama pattern: backup_${db_name}_*.7z" >> "$LOG_FILE"
         if ! find "$ZIP_DIR" -maxdepth 1 -type f -name "backup_${db_name}_*.7z" -mmin -1440 | grep -q .; then
+            echo "DEBUG: Zip bulunamadı, SQL dosyası listeye ekleniyor" >> "$LOG_FILE"
             sql_files+="$(stat -c '%Y %n' "$sql_file")\n"
+        else
+            echo "DEBUG: Bu veritabanı için zaten zip var, atlanıyor" >> "$LOG_FILE"
         fi
     done < <(find "$BACKUP_DIR" -maxdepth 4 -type f -name "*.sql" -mmin -1440)
     
     # Boşlukları temizle ve sırala
     sql_files=$(echo -e "$sql_files" | sort -nr)
+    echo "DEBUG: Final SQL dosyaları listesi:" >> "$LOG_FILE"
+    echo "$sql_files" >> "$LOG_FILE"
     
     if [ -z "$sql_files" ]; then
         log_message "Ziplenmesi gereken yeni SQL dosyası yok."
@@ -197,9 +211,12 @@ main() {
 
     # Her SQL dosyası için ayrı işlem yap
     local IFS=$'\n'
+    echo "DEBUG: Döngü başlıyor..." >> "$LOG_FILE"
     while read -r line; do
+        echo "DEBUG: İşlenen satır: $line" >> "$LOG_FILE"
         local timestamp=$(echo "$line" | cut -d' ' -f1)
         local filepath=$(echo "$line" | cut -d' ' -f2-)
+        echo "DEBUG: Parçalanan değerler - timestamp: $timestamp, filepath: $filepath" >> "$LOG_FILE"
         
         if [ -n "$filepath" ]; then
             ((total_count++))
