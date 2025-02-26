@@ -15,7 +15,6 @@ source "$ENV_FILE"
 
 # Kritik bağımlılıkları kontrol et
 command -v 7z >/dev/null 2>&1 || { echo "HATA: 7zip yüklü değil"; exit 1; }
-command -v zabbix_sender >/dev/null 2>&1 || { echo "HATA: zabbix-sender yüklü değil"; exit 1; }
 
 # Kritik değişkenleri kontrol et
 for var in BACKUP_DIR ZIP_DIR ZABBIX_SERVER ENCRYPTION_KEY_FILE; do

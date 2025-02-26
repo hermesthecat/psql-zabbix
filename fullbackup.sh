@@ -17,6 +17,26 @@ send_to_zabbix() {
     zabbix_sender -z "$ZABBIX_SERVER" -s "$HOSTNAME" -k "backup.status" -o "$MESSAGE" >/dev/null 2>&1
 }
 
+# PostgreSQL servis kontrolü
+check_postgresql() {
+    if ! systemctl is-active --quiet postgresql; then
+        log_message "HATA: PostgreSQL servisi çalışmıyor!"
+        echo "HATA: PostgreSQL servisi çalışmıyor!"
+        send_to_zabbix "PostgreSQL servisi çalışmıyor" "backup.postgresql_status"
+        return 1
+    fi
+    
+    # PostgreSQL'e bağlanabilme kontrolü
+    if ! psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c '\q' >/dev/null 2>&1; then
+        log_message "HATA: PostgreSQL'e bağlanılamıyor!"
+        echo "HATA: PostgreSQL'e bağlanılamıyor!"
+        send_to_zabbix "PostgreSQL'e bağlanılamıyor" "backup.postgresql_status"
+        return 1
+    fi
+    
+    return 0
+}
+
 echo "----------------------------" >> "$LOG_FILE"
 echo "$(date '+%Y-%m-%d %H:%M:%S') - Backup process started" >> "$LOG_FILE"
 echo "$(date '+%Y-%m-%d %H:%M:%S') - Backup process started"
@@ -45,6 +65,11 @@ run_step() {
     echo "$SUCCESS_MSG" >> "$LOG_FILE"
     send_to_zabbix "$SUCCESS_MSG"
 }
+
+# PostgreSQL servis kontrolü
+if ! check_postgresql; then
+    exit 1
+fi
 
 # Sırasıyla scriptleri çalıştır
 run_step "PostgreSQL Backup" "/root/pgbackup.sh"
