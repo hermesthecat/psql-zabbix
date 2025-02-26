@@ -25,7 +25,7 @@ log_message() {
 
 # En son yedek dosyasını bulma
 find_latest_backup() {
-    local latest_backup=$(find $BACKUP_DIR -type f -name "backup_*.7z" | sort -r | head -n 1)
+    local latest_backup=$(find $ZIP_DIR -type f -name "backup_*.7z" | sort -r | head -n 1)
     echo "$latest_backup"
 }
 
