@@ -46,6 +46,7 @@ get_auth_token() {
     fi
     
     log_message "HATA: pCloud login başarısız! API Yanıtı: $auth_response"
+    echo "HATA: pCloud login başarısız! API Yanıtı: $auth_response"
     return 1
 }
 
@@ -73,6 +74,7 @@ upload_to_pcloud() {
     local start_time=$(date +%s)
     
     log_message "pCloud yüklemesi başlıyor: $file_name (Boyut: ${file_size}MB)"
+    echo "pCloud yüklemesi başlıyor: $file_name (Boyut: ${file_size}MB)"
     send_to_zabbix "$file_size" "pcloud.upload.size"
     
     # pCloud API çağrısı
@@ -93,7 +95,8 @@ upload_to_pcloud() {
     if echo "$response" | grep -q '"result":0'; then
         local success_msg="pCloud yüklemesi başarılı: $file_name (${file_size}MB, ${speed}MB/s, ${duration}s)"
         log_message "$success_msg"
-        
+        echo "$success_msg"
+
         # Metrikleri Zabbix'e gönder
         send_to_zabbix "$speed" "pcloud.upload.speed"
         send_to_zabbix "$duration" "pcloud.upload.duration"
@@ -107,8 +110,10 @@ upload_to_pcloud() {
             
             if [ "$cloud_size" -eq "$file_size" ]; then
                 log_message "pCloud dosya boyutu doğrulandı"
+                echo "pCloud dosya boyutu doğrulandı"
             else
                 log_message "HATA: pCloud dosya boyutu eşleşmiyor! Yerel: ${file_size}MB, pCloud: ${cloud_size}MB"
+                echo "HATA: pCloud dosya boyutu eşleşmiyor! Yerel: ${file_size}MB, pCloud: ${cloud_size}MB"
                 return 1
             fi
         fi
@@ -117,6 +122,7 @@ upload_to_pcloud() {
     else
         local error_msg="HATA: pCloud yüklemesi başarısız! API Yanıtı: $response"
         log_message "$error_msg"
+        echo "HATA: pCloud yüklemesi başarısız! API Yanıtı: $response"
         return 1
     fi
 }
@@ -125,6 +131,7 @@ upload_to_pcloud() {
 main() {
     if [ $# -ne 2 ]; then
         log_message "HATA: Eksik parametre! Kullanım: $0 <dosya_yolu> <folder_id>"
+        echo "HATA: Eksik parametre! Kullanım: $0 <dosya_yolu> <folder_id>"
         exit 1
     fi
     
@@ -134,15 +141,18 @@ main() {
     # Dosya kontrolü
     if [ ! -f "$file_path" ]; then
         log_message "HATA: Dosya bulunamadı: $file_path"
+        echo "HATA: Dosya bulunamadı: $file_path"
         exit 1
     fi
     
     # pCloud'a yükleme
     if upload_to_pcloud "$file_path" "$folder_id"; then
-        log_message "İşlem başarıyla tamamlandı"
+        log_message "PCloud yükleme işlemi başarıyla tamamlandı"
+        echo "PCloud yükleme işlemi başarıyla tamamlandı"
         exit 0
     else
-        log_message "İşlem başarısız!"
+        log_message "PCloud yükleme işlemi başarısız!"
+        echo "PCloud yükleme işlemi başarısız!"
         exit 1
     fi
 }

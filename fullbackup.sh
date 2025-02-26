@@ -19,6 +19,7 @@ send_to_zabbix() {
 
 echo "----------------------------" >> "$LOG_FILE"
 echo "$(date '+%Y-%m-%d %H:%M:%S') - Backup process started" >> "$LOG_FILE"
+echo "$(date '+%Y-%m-%d %H:%M:%S') - Backup process started"
 send_to_zabbix "Backup process started"
 
 run_step() {
@@ -26,18 +27,21 @@ run_step() {
     SCRIPT_PATH=$2
 
     echo "$(date '+%Y-%m-%d %H:%M:%S') - Running $STEP_NAME..." >> "$LOG_FILE"
-
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - Running $STEP_NAME..."
+    
     OUTPUT=$($SCRIPT_PATH 2>&1)
     EXIT_CODE=$?
 
     if [ $EXIT_CODE -ne 0 ]; then
         ERROR_MSG="$(date '+%Y-%m-%d %H:%M:%S') - ERROR: $STEP_NAME failed! Exit Code: $EXIT_CODE | Error: $OUTPUT"
+        echo "$ERROR_MSG"
         echo "$ERROR_MSG" >> "$LOG_FILE"
         send_to_zabbix "$ERROR_MSG"
         exit 1
     fi
 
     SUCCESS_MSG="$(date '+%Y-%m-%d %H:%M:%S') - SUCCESS: $STEP_NAME completed."
+    echo "$SUCCESS_MSG"
     echo "$SUCCESS_MSG" >> "$LOG_FILE"
     send_to_zabbix "$SUCCESS_MSG"
 }
@@ -49,5 +53,6 @@ run_step "Uploading Backup" "/root/upload.sh"
 run_step "Verifying Backup" "/root/verify_backup.sh"
 
 FINAL_MSG="$(date '+%Y-%m-%d %H:%M:%S') - SUCCESS: Backup process completed!"
+echo "$FINAL_MSG"
 echo "$FINAL_MSG" >> "$LOG_FILE"
 send_to_zabbix "$FINAL_MSG"

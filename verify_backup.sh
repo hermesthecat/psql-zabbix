@@ -52,6 +52,7 @@ test_backup_restore() {
     local success=0
     
     log_message "Test restore başlatılıyor: $backup_file"
+    echo "Test restore başlatılıyor: $backup_file"
     
     # Yedek dosyasını geçici dizine açma
     if [[ $backup_file == *.bz2 ]]; then
@@ -73,12 +74,15 @@ test_backup_restore() {
             local table_count=$(PGPASSWORD=$PGPASSWORD psql -h localhost -U postgres -d "$TEST_DB_NAME" -t -c "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public';")
             
             log_message "Test restore başarılı! DB Boyutu: $db_size, Tablo Sayısı: $table_count"
+            echo "Test restore başarılı! DB Boyutu: $db_size, Tablo Sayısı: $table_count"
             success=1
         else
             log_message "HATA: Test restore başarısız - SQL yükleme hatası"
+            echo "HATA: Test restore başarısız - SQL yükleme hatası"
         fi
     else
         log_message "HATA: Test restore başarısız - Test DB oluşturulamadı"
+        echo "HATA: Test restore başarısız - Test DB oluşturulamadı"
     fi
     
     # Temizlik
@@ -93,6 +97,7 @@ create_checksum_dir() {
     if [ ! -d "$CHECKSUM_DIR" ]; then
         mkdir -p "$CHECKSUM_DIR"
         log_message "Checksum dizini oluşturuldu: $CHECKSUM_DIR"
+        echo "Checksum dizini oluşturuldu: $CHECKSUM_DIR"
     fi
 }
 
@@ -114,7 +119,8 @@ generate_checksums() {
     echo "Boyut: $(du -h "$backup_file" | cut -f1)" >> "$checksum_file"
     
     log_message "Checksumlar oluşturuldu: $checksum_file"
-    
+    echo "Checksumlar oluşturuldu: $checksum_file"
+
     # Checksum değerlerini döndür
     echo "$md5sum:$sha256sum"
 }
@@ -128,6 +134,7 @@ verify_checksums() {
     # Eğer checksum dosyası yoksa, yeni oluştur
     if [ ! -f "$checksum_file" ]; then
         log_message "Checksum dosyası bulunamadı, yeni oluşturuluyor..."
+        echo "Checksum dosyası bulunamadı, yeni oluşturuluyor..."
         generate_checksums "$backup_file"
         return 0
     fi
@@ -143,25 +150,33 @@ verify_checksums() {
     # Karşılaştır
     if [ "$stored_md5" != "$current_md5" ]; then
         log_message "HATA: MD5 checksum eşleşmiyor!"
+        echo "HATA: MD5 checksum eşleşmiyor!"
         log_message "Beklenen: $stored_md5"
+        echo "Beklenen: $stored_md5"
         log_message "Hesaplanan: $current_md5"
+        echo "Hesaplanan: $current_md5"
         return 1
     fi
     
     if [ "$stored_sha256" != "$current_sha256" ]; then
         log_message "HATA: SHA256 checksum eşleşmiyor!"
+        echo "HATA: SHA256 checksum eşleşmiyor!"
         log_message "Beklenen: $stored_sha256"
+        echo "Beklenen: $stored_sha256"
         log_message "Hesaplanan: $current_sha256"
+        echo "Hesaplanan: $current_sha256"
         return 1
     fi
     
     log_message "Checksum doğrulaması başarılı"
+    echo "Checksum doğrulaması başarılı"
     return 0
 }
 
 # Ana doğrulama süreci
 main() {
     log_message "Yedek doğrulama süreci başlatıldı"
+    echo "Yedek doğrulama süreci başlatıldı"
     
     # Checksum dizinini oluştur
     create_checksum_dir
@@ -169,6 +184,7 @@ main() {
     local backup_file=$(find_latest_backup)
     if [ -z "$backup_file" ]; then
         log_message "HATA: Yedek dosyası bulunamadı!"
+        echo "HATA: Yedek dosyası bulunamadı!"
         exit 1
     fi
     
@@ -177,19 +193,23 @@ main() {
     # Dosya bütünlüğü kontrolü
     if ! verify_backup_integrity "$backup_file"; then
         log_message "HATA: Yedek dosyası bütünlük kontrolünden geçemedi!"
+        echo "HATA: Yedek dosyası bütünlük kontrolünden geçemedi!"
         exit 1
     fi
     log_message "Dosya bütünlük kontrolü başarılı"
+    echo "Dosya bütünlük kontrolü başarılı"
     
     # Checksum kontrolü
     if ! verify_checksums "$backup_file"; then
         log_message "HATA: Checksum doğrulaması başarısız!"
+        echo "HATA: Checksum doğrulaması başarısız!"
         exit 1
     fi
     
     # Test restore işlemi
     if ! test_backup_restore "$backup_file"; then
         log_message "HATA: Test restore işlemi başarısız!"
+        echo "HATA: Test restore işlemi başarısız!"
         exit 1
     fi
     
@@ -197,6 +217,7 @@ main() {
     generate_checksums "$backup_file"
     
     log_message "Yedek doğrulama süreci başarıyla tamamlandı"
+    echo "Yedek doğrulama süreci başarıyla tamamlandı"
 }
 
 # Script'i çalıştır

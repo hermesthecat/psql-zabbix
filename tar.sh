@@ -60,6 +60,7 @@ compress_and_encrypt_backup() {
     # Kaynak dizin boyutunu al
     local original_size=$(du -sm "$source_dir" | cut -f1)
     log_message "Sıkıştırma ve şifreleme başlıyor: $source_dir (Boyut: ${original_size}MB)"
+    echo "Sıkıştırma ve şifreleme başlıyor: $source_dir (Boyut: ${original_size}MB)"
     send_to_zabbix "$original_size" "backup.tar.original_size"
     
     # 7zip ile sıkıştır ve şifrele
@@ -78,6 +79,7 @@ compress_and_encrypt_backup() {
         
         local success_msg="Sıkıştırma ve şifreleme başarılı: ${encrypted_size}MB (Oran: %${compression_ratio}, Hız: ${speed}MB/s, Süre: ${duration}s)"
         log_message "$success_msg"
+        echo "$success_msg"
         
         # Metrikleri Zabbix'e gönder
         send_to_zabbix "$encrypted_size" "backup.tar.encrypted_size"
@@ -91,15 +93,18 @@ compress_and_encrypt_backup() {
         
         if [ $verify_status -eq 0 ]; then
             log_message "Yedek doğrulama başarılı: $target_file"
+            echo "Yedek doğrulama başarılı: $target_file"
             send_to_zabbix "1" "backup.tar.verify"
             return 0
         else
             log_message "HATA: Yedek doğrulama başarısız: $target_file"
+            echo "HATA: Yedek doğrulama başarısız: $target_file"
             send_to_zabbix "0" "backup.tar.verify"
             return 1
         fi
     else
         log_message "HATA: Sıkıştırma ve şifreleme başarısız: $source_dir"
+        echo "HATA: Sıkıştırma ve şifreleme başarısız: $source_dir"
         send_to_zabbix "0" "backup.tar.status"
         return 1
     fi
@@ -112,6 +117,7 @@ main() {
     
     if [ -z "$latest_backup" ]; then
         log_message "HATA: Sıkıştırılacak yedek dizini bulunamadı!"
+        echo "HATA: Sıkıştırılacak yedek dizini bulunamadı!"
         exit 1
     fi
     
@@ -120,13 +126,16 @@ main() {
     local target_file="$BACKUP_DIR/daily/backup_${backup_date}.tar.gz.enc"
     
     log_message "Yedek sıkıştırma ve şifreleme işlemi başlatılıyor..."
+    echo "Yedek sıkıştırma ve şifreleme işlemi başlatılıyor..."
     
     # Sıkıştırma ve şifreleme işlemini başlat
     if compress_and_encrypt_backup "$latest_backup" "$target_file"; then
         log_message "Yedek sıkıştırma ve şifreleme işlemi başarıyla tamamlandı"
+        echo "Yedek sıkıştırma ve şifreleme işlemi başarıyla tamamlandı"
         exit 0
     else
         log_message "Yedek sıkıştırma ve şifreleme işlemi başarısız!"
+        echo "Yedek sıkıştırma ve şifreleme işlemi başarısız!"
         exit 1
     fi
 }
