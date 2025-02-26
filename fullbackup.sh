@@ -47,7 +47,7 @@ cleanup_zip_files() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') - ZIP dosyaları temizleniyor..." >> "$LOG_FILE"
     echo "$(date '+%Y-%m-%d %H:%M:%S') - ZIP dosyaları temizleniyor..."
     
-    local zip_files=$(find "$BACKUP_DIR" -maxdepth 4 -type f -name "*.7z" -mmin -1440)
+    local zip_files=$(find "$ZIP_DIR" -maxdepth 4 -type f -name "*.7z" -mmin -1440)
         local count=0
     
     for file in $zip_files; do
