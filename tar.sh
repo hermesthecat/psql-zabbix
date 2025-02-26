@@ -104,7 +104,9 @@ compress_and_encrypt_backup() {
     esac
     
     # 7zip ile sıkıştır ve şifrele
-    7z a $compression_params -p"$password" "$target_file" "$source_dir" >/dev/null 2>&1
+    echo "DEBUG: 7zip komutu: 7z a $compression_params -p***** $target_file $source_dir" >> "$LOG_FILE"
+    local zip_output
+    zip_output=$(7z a $compression_params -p"$password" "$target_file" "$source_dir" 2>&1)
     local zip_status=$?
     
     if [ $zip_status -eq 0 ]; then
@@ -145,6 +147,7 @@ compress_and_encrypt_backup() {
     else
         log_message "HATA: Sıkıştırma ve şifreleme başarısız: $source_dir"
         echo "HATA: Sıkıştırma ve şifreleme başarısız: $source_dir"
+        echo "DEBUG: 7zip çıktısı: $zip_output" >> "$LOG_FILE"
         send_to_zabbix "0" "backup.tar.status"
         return 1
     fi
@@ -232,12 +235,21 @@ main() {
             # SQL dosyasının boyutunu kontrol et
             local file_size=$(du -sm "$filepath" | cut -f1)
             echo "DEBUG: file_size = $file_size MB" >> "$LOG_FILE"
+            
+            # Disk alanı kontrolü
+            echo "DEBUG: Disk alanı durumu:" >> "$LOG_FILE"
+            df -h "$ZIP_DIR" >> "$LOG_FILE"
+            
             local available_space=$(df -m "$ZIP_DIR" | tail -1 | awk '{print $4}')
             echo "DEBUG: available_space = $available_space MB" >> "$LOG_FILE"
             
-            if [ $available_space -lt $file_size ]; then
-                log_message "HATA: $filepath için yeterli alan yok. Gerekli: ${file_size}MB, Mevcut: ${available_space}MB"
-                echo "HATA: $filepath için yeterli alan yok. Gerekli: ${file_size}MB, Mevcut: ${available_space}MB"
+            # Tahmini sıkıştırılmış boyut (orijinal boyutun %50'si + 1GB buffer)
+            local estimated_size=$((file_size / 2 + 1024))
+            echo "DEBUG: Tahmini gerekli alan = $estimated_size MB" >> "$LOG_FILE"
+            
+            if [ $available_space -lt $estimated_size ]; then
+                log_message "HATA: $filepath için yeterli alan yok. Gerekli: ${estimated_size}MB, Mevcut: ${available_space}MB"
+                echo "HATA: $filepath için yeterli alan yok. Gerekli: ${estimated_size}MB, Mevcut: ${available_space}MB"
                 continue
             fi
             
