@@ -131,27 +131,56 @@ upload_to_pcloud() {
 
 # Ana fonksiyon
 main() {
-    # En son şifrelenmiş yedeği bul
-    local latest_backup=$(find $ZIP_DIR -type f -name "backup_*.7z" | sort -r | head -n 1)
+    # Son çalışmadan bu yana oluşturulan yedekleri bul (24 saat içinde)
+    echo "Yeni yedekler aranıyor..." >> "$LOG_FILE"
+    local new_backups=$(find "$ZIP_DIR" -type f -name "backup_*.7z" -mmin -1440 -printf '%T@ %p\n' | sort -n)
     
-    if [ -z "$latest_backup" ]; then
-        log_message "HATA: Yüklenecek yedek dosyası bulunamadı!"
-        echo "HATA: Yüklenecek yedek dosyası bulunamadı!"
+    if [ -z "$new_backups" ]; then
+        log_message "HATA: Yüklenecek yeni yedek dosyası bulunamadı!"
+        echo "HATA: Yüklenecek yeni yedek dosyası bulunamadı!"
         exit 1
     fi
+
+    local success_count=0
+    local total_count=0
+
+    # Her yedek dosyası için ayrı işlem yap
+    echo "$new_backups" | while read timestamp filepath; do
+        if [ -n "$filepath" ]; then
+            ((total_count++))
+            
+            log_message "pCloud'a yükleniyor: $filepath"
+            echo "pCloud'a yükleniyor: $filepath"
+            
+            # pCloud'a yükleme işlemini başlat
+            if upload_to_pcloud "$filepath"; then
+                ((success_count++))
+                log_message "$filepath başarıyla yüklendi"
+                echo "$filepath başarıyla yüklendi"
+                
+                # Başarılı yüklemeyi Zabbix'e bildir
+                send_to_zabbix "1" "backup.upload.status"
+                
+                # Dosya boyutunu Zabbix'e gönder
+                local file_size=$(du -m "$filepath" | cut -f1)
+                send_to_zabbix "$file_size" "backup.upload.size"
+            else
+                log_message "HATA: $filepath yükleme başarısız!"
+                echo "HATA: $filepath yükleme başarısız!"
+                send_to_zabbix "0" "backup.upload.status"
+            fi
+        fi
+    done
+
+    # Sonuç raporu
+    local summary="Toplam: $total_count dosya, Başarılı: $success_count, Başarısız: $((total_count - success_count))"
+    log_message "$summary"
+    echo "$summary"
     
-    log_message "pCloud yükleme işlemi başlatılıyor..."
-    echo "pCloud yükleme işlemi başlatılıyor..."
-    
-    # pCloud'a yükleme işlemini başlat
-    if upload_to_pcloud "$latest_backup"; then
-        log_message "pCloud yükleme işlemi başarıyla tamamlandı"
-        echo "pCloud yükleme işlemi başarıyla tamamlandı"
-        exit 0
-    else
-        log_message "pCloud yükleme işlemi başarısız!"
-        echo "pCloud yükleme işlemi başarısız!"
+    if [ $success_count -eq 0 ]; then
         exit 1
+    else
+        exit 0
     fi
 }
 
