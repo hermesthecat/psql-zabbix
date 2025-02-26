@@ -132,7 +132,7 @@ upload_to_pcloud() {
 # Ana fonksiyon
 main() {
     # En son şifrelenmiş yedeği bul
-    local latest_backup=$(find $BACKUP_DIR/daily -type f -name "backup_*.7z" | sort -r | head -n 1)
+    local latest_backup=$(find $ZIP_DIR -type f -name "backup_*.7z" | sort -r | head -n 1)
     
     if [ -z "$latest_backup" ]; then
         log_message "HATA: Yüklenecek yedek dosyası bulunamadı!"
