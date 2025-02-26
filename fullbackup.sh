@@ -47,10 +47,10 @@ run_step() {
 }
 
 # Sırasıyla scriptleri çalıştır
-run_step "PostgreSQL Backup" "/root/pgbackup.sh"
-run_step "Archiving Backup" "/root/tar.sh"
-run_step "Uploading Backup" "/root/upload.sh"
-run_step "Verifying Backup" "/root/verify_backup.sh"
+run_step "PostgreSQL Backup" "./pgbackup.sh"
+run_step "Archiving Backup" "./tar.sh"
+run_step "Uploading Backup" "./upload.sh"
+run_step "Verifying Backup" "./verify_backup.sh"
 
 FINAL_MSG="$(date '+%Y-%m-%d %H:%M:%S') - SUCCESS: Backup process completed!"
 echo "$FINAL_MSG"
