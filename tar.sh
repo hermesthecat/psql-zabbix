@@ -73,17 +73,35 @@ calculate_compression_ratio() {
 compress_and_encrypt_backup() {
     local source_dir=$1
     local target_file=$2
+    local compression_speed=${3:-"fast"}  # Varsayılan: fast
     local password=$(cat "$ENCRYPTION_KEY_FILE")
     local start_time=$(date +%s)
     
     # Kaynak dizin boyutunu al
     local original_size=$(du -sm "$source_dir" | cut -f1)
-    log_message "Sıkıştırma ve şifreleme başlıyor: $source_dir (Boyut: ${original_size}MB)"
-    echo "Sıkıştırma ve şifreleme başlıyor: $source_dir (Boyut: ${original_size}MB)"
+    log_message "Sıkıştırma ve şifreleme başlıyor: $source_dir (Boyut: ${original_size}MB, Mod: $compression_speed)"
+    echo "Sıkıştırma ve şifreleme başlıyor: $source_dir (Boyut: ${original_size}MB, Mod: $compression_speed)"
     send_to_zabbix "$original_size" "backup.tar.original_size"
     
+    # Sıkıştırma parametrelerini ayarla
+    local compression_params
+    case "$compression_speed" in
+        "ultra")
+            compression_params="-t7z -m0=lz4 -mx=1 -mfb=16 -md=8m -ms=off -mhe=on"
+            ;;
+        "fast")
+            compression_params="-t7z -m0=lzma2 -mx=3 -mfb=32 -md=16m -ms=off -mhe=on"
+            ;;
+        "max")
+            compression_params="-t7z -m0=lzma2 -mx=9 -mfb=64 -md=32m -ms=on -mhe=on"
+            ;;
+        *)
+            compression_params="-t7z -m0=lzma2 -mx=3 -mfb=32 -md=16m -ms=off -mhe=on"
+            ;;
+    esac
+    
     # 7zip ile sıkıştır ve şifrele
-    7z a -t7z -m0=lzma2 -mx=9 -mfb=64 -md=32m -ms=on -mhe=on -p"$password" "$target_file" "$source_dir" >/dev/null 2>&1
+    7z a $compression_params -p"$password" "$target_file" "$source_dir" >/dev/null 2>&1
     local zip_status=$?
     
     if [ $zip_status -eq 0 ]; then
@@ -131,6 +149,18 @@ compress_and_encrypt_backup() {
 
 # Ana fonksiyon
 main() {
+    # Sıkıştırma hızını kontrol et (env dosyasından veya varsayılan)
+    local compression_speed=${COMPRESSION_SPEED:-"fast"}
+    
+    # Geçerli bir sıkıştırma hızı mı kontrol et
+    case "$compression_speed" in
+        "ultra"|"fast"|"max") ;;
+        *)
+            log_message "UYARI: Geçersiz sıkıştırma hızı '$compression_speed'. Varsayılan 'fast' kullanılıyor."
+            compression_speed="fast"
+            ;;
+    esac
+    
     # BACKUP_DIR içeriğini kontrol et ve logla
     if [ ! -d "$BACKUP_DIR" ]; then
         log_message "HATA: $BACKUP_DIR dizini mevcut değil!"
@@ -148,6 +178,8 @@ main() {
     if [ -z "$sql_files" ]; then
         log_message "HATA: Hiç SQL yedek dosyası bulunamadı!"
         echo "HATA: Hiç SQL yedek dosyası bulunamadı!"
+        echo "Dizin içeriği:"
+        ls -la "$BACKUP_DIR"
         exit 1
     fi
 
@@ -174,8 +206,8 @@ main() {
             local datetime=$(date +%Y%m%d_%H%M%S)
             local target_file="$ZIP_DIR/backup_${db_name}_${datetime}.7z"
             
-            log_message "İşleniyor: $filepath"
-            echo "İşleniyor: $filepath"
+            log_message "İşleniyor: $filepath (Sıkıştırma Modu: $compression_speed)"
+            echo "İşleniyor: $filepath (Sıkıştırma Modu: $compression_speed)"
             
             # Geçici bir dizin oluştur
             local temp_dir="${BACKUP_DIR}/temp_${db_name}_${datetime}"
@@ -183,7 +215,7 @@ main() {
             cp "$filepath" "$temp_dir/"
             
             # Sıkıştırma ve şifreleme işlemini başlat
-            if compress_and_encrypt_backup "$temp_dir" "$target_file"; then
+            if compress_and_encrypt_backup "$temp_dir" "$target_file" "$compression_speed"; then
                 ((success_count++))
                 log_message "$filepath başarıyla sıkıştırıldı: $target_file"
                 echo "$filepath başarıyla sıkıştırıldı: $target_file"
