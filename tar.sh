@@ -171,23 +171,32 @@ main() {
     echo "Yedek dizini içeriği:" >> "$LOG_FILE"
     ls -la "$BACKUP_DIR" >> "$LOG_FILE"
 
-    # Tüm SQL dosyalarını bul
-    echo "SQL dosyaları aranıyor: $BACKUP_DIR/*.sql" >> "$LOG_FILE"
-    local sql_files=$(find "$BACKUP_DIR" -maxdepth 4 -type f -name "*.sql" -mmin -1440 -printf '%T@ %p\n' | sort -nr)
+    # Henüz ziplenmemiş SQL dosyalarını bul
+    echo "Ziplenmemiş SQL dosyaları aranıyor..." >> "$LOG_FILE"
+    local sql_files=""
+    while IFS= read -r sql_file; do
+        # SQL dosyasının adından veritabanı adını çıkar
+        local db_name=$(basename "$sql_file" .sql)
+        # Son 24 saat içinde bu veritabanı için zip yapılmış mı kontrol et
+        if ! find "$ZIP_DIR" -maxdepth 1 -type f -name "backup_${db_name}_*.7z" -mmin -1440 | grep -q .; then
+            sql_files+="$(stat -c '%Y %n' "$sql_file")\n"
+        fi
+    done < <(find "$BACKUP_DIR" -maxdepth 4 -type f -name "*.sql" -mmin -1440)
+    
+    # Boşlukları temizle ve sırala
+    sql_files=$(echo -e "$sql_files" | sort -nr)
     
     if [ -z "$sql_files" ]; then
-        log_message "HATA: Hiç SQL yedek dosyası bulunamadı!"
-        echo "HATA: Hiç SQL yedek dosyası bulunamadı!"
-        echo "Dizin içeriği:"
-        ls -la "$BACKUP_DIR"
-        exit 1
+        log_message "Ziplenmesi gereken yeni SQL dosyası yok."
+        echo "Ziplenmesi gereken yeni SQL dosyası yok."
+        exit 0
     fi
 
     local success_count=0
     local total_count=0
 
     # Her SQL dosyası için ayrı işlem yap
-    echo "$sql_files" | while read timestamp filepath; do
+    echo "$sql_files" | while read -r timestamp filepath; do
         if [ -n "$filepath" ]; then
             ((total_count++))
             
@@ -234,7 +243,7 @@ main() {
     log_message "$summary"
     echo "$summary"
     
-    if [ $success_count -eq 0 ]; then
+    if [ $success_count -eq 0 ] && [ $total_count -ne 0 ]; then
         exit 1
     else
         exit 0
