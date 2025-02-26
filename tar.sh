@@ -72,6 +72,11 @@ calculate_compression_ratio() {
     echo "$ratio"
 }
 
+#delete temp folders in backup_dir
+delete_temp_folders() {
+    find "$BACKUP_DIR" -maxdepth 1 -type d -name "temp_*" -mmin +1440 -exec rm -rf {} \;
+}
+
 # Sıkıştırma ve şifreleme işlemi
 compress_and_encrypt_backup() {
     local source_dir=$1
@@ -155,6 +160,7 @@ compress_and_encrypt_backup() {
 
 # Ana fonksiyon
 main() {
+    delete_temp_folders
     # Sıkıştırma hızını kontrol et (env dosyasından veya varsayılan)
     local compression_speed=${COMPRESSION_SPEED:-"fast"}
     
