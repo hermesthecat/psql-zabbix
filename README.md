@@ -6,13 +6,12 @@ Bu proje, PostgreSQL veritabanlarının otomatik yedeklenmesi, sıkıştırılma
 
 - Otomatik PostgreSQL yedekleme
 - Günlük, haftalık ve aylık yedek rotasyonu
-- Yedeklerin sıkıştırılması (bzip2/gzip)
-- AES-256-CBC şifreleme ile güvenli yedekleme
+- 7zip ile gelişmiş sıkıştırma (LZMA2)
+- AES-256 şifreleme ile güvenli yedekleme
 - Uzak sunucuya yedek yükleme
 - pCloud entegrasyonu
 - Kapsamlı yedek doğrulama sistemi:
-  - MD5 ve SHA256 checksum kontrolü
-  - Arşiv bütünlüğü testi
+  - 7zip bütünlük kontrolü
   - Şifreleme doğrulama testi
   - Test veritabanında restore denemesi
 - Zabbix entegrasyonu ile monitoring
@@ -24,7 +23,7 @@ Bu proje, PostgreSQL veritabanlarının otomatik yedeklenmesi, sıkıştırılma
 ### Script Yapısı
 - **fullbackup.sh**: Ana koordinatör script
 - **pgbackup.sh**: PostgreSQL yedekleme işlemleri
-- **tar.sh**: Yedek sıkıştırma işlemleri
+- **tar.sh**: 7zip ile sıkıştırma ve şifreleme işlemleri
 - **upload.sh**: Uzak sunucuya yükleme işlemleri
 - **pcloud.sh**: pCloud'a yükleme işlemleri
 - **verify_backup.sh**: Yedek doğrulama işlemleri
@@ -33,23 +32,33 @@ Bu proje, PostgreSQL veritabanlarının otomatik yedeklenmesi, sıkıştırılma
 - **/.backup_env**: Merkezi yapılandırma dosyası
 - **/.pgpass**: PostgreSQL kimlik bilgileri
 - **/.pcloud_credentials**: pCloud kimlik bilgileri (opsiyonel)
-- **/.backup_encryption_key**: AES şifreleme anahtarı (otomatik oluşturulur)
+- **/.backup_encryption_key**: 7zip şifreleme anahtarı (otomatik oluşturulur)
 
 ### Log Dosyaları
 - **/var/log/backup_runner.log**: Ana yedekleme logları
 - **/var/log/backup_verify.log**: Doğrulama logları
-- **/var/log/backup_tar.log**: Sıkıştırma logları
+- **/var/log/backup_tar.log**: Sıkıştırma ve şifreleme logları
 - **/var/log/pcloud_upload.log**: pCloud yükleme logları
 
 ## Kurulum
 
-1. Scriptleri kopyalayın:
+1. Gerekli paketleri yükleyin:
+```bash
+# Debian/Ubuntu
+apt-get update
+apt-get install p7zip-full postgresql-client zabbix-agent
+
+# RHEL/CentOS
+yum install p7zip p7zip-plugins postgresql zabbix-agent
+```
+
+2. Scriptleri kopyalayın:
 ```bash
 cp *.sh /root/
 chmod +x /root/*.sh
 ```
 
-2. Dizinleri oluşturun:
+3. Dizinleri oluşturun:
 ```bash
 mkdir -p /home/pg_backup/backup/{daily,weekly,monthly,checksums}
 mkdir -p /var/log
@@ -58,7 +67,7 @@ touch /var/log/pcloud_upload.log
 chmod 640 /var/log/backup_*.log
 ```
 
-3. Merkezi yapılandırma dosyasını oluşturun:
+4. Merkezi yapılandırma dosyasını oluşturun:
 ```bash
 cat > /root/.backup_env << 'EOF'
 PCLOUD_USERNAME="your_username"
@@ -77,17 +86,29 @@ EOF
 chmod 600 /root/.backup_env
 ```
 
-4. PostgreSQL bağlantı dosyasını oluşturun:
+5. PostgreSQL bağlantı dosyasını oluşturun:
 ```bash
 echo "localhost:5432:*:postgres:your_password" > ~/.pgpass
 chmod 600 ~/.pgpass
 ```
 
-5. Şifreleme anahtarı otomatik olarak oluşturulacaktır:
+6. Şifreleme anahtarı otomatik olarak oluşturulacaktır:
    - İlk çalıştırmada `/root/.backup_encryption_key` dosyası oluşturulur
-   - 32 byte'lık rastgele AES-256 anahtarı üretilir
+   - 32 karakterlik rastgele şifre üretilir
    - Dosya izinleri 600 olarak ayarlanır (sadece root okuyabilir)
-   - **ÖNEMLİ**: Bu anahtarı güvenli bir yerde yedeklemeyi unutmayın!
+   - **ÖNEMLİ**: Bu şifreyi güvenli bir yerde yedeklemeyi unutmayın!
+
+## 7zip Sıkıştırma ve Şifreleme Parametreleri
+
+Sistem, yedekleri sıkıştırmak ve şifrelemek için 7zip kullanır. Kullanılan parametreler:
+
+- `-t7z`: 7z formatını kullanır
+- `-m0=lzma2`: LZMA2 sıkıştırma algoritması (yüksek sıkıştırma oranı)
+- `-mx=9`: En yüksek sıkıştırma seviyesi
+- `-mfb=64`: 64 kelimelik sözcük boyutu
+- `-md=32m`: 32MB sözlük boyutu (daha iyi sıkıştırma)
+- `-ms=on`: Katı sıkıştırma modu
+- `-mhe=on`: Başlık şifreleme aktif (ekstra güvenlik)
 
 ## Kullanım
 
@@ -98,17 +119,28 @@ chmod 600 ~/.pgpass
 
 # Sadece doğrulama
 /root/verify_backup.sh
-
-# Sadece pCloud'a yükleme
-/root/pcloud.sh /yol/dosya.tar.gz folder_id
 ```
 
-### Otomatik Çalıştırma
+### Otomatik Çalıştırma (Cron)
 ```bash
-# Crontab yapılandırması
-0 1 * * * /root/fullbackup.sh  # Her gece 01:00'de yedekleme
-0 7 * * * /root/verify_backup.sh  # Her sabah 07:00'de doğrulama
+# Günlük yedekleme (her gece 01:00'de)
+0 1 * * * /root/fullbackup.sh
+
+# Haftalık doğrulama (her Pazar 03:00'de)
+0 3 * * 0 /root/verify_backup.sh
 ```
+
+## Monitoring
+
+Sistem, Zabbix ile entegre çalışır ve aşağıdaki metrikleri gönderir:
+
+- `backup.tar.original_size`: Orijinal yedek boyutu (MB)
+- `backup.tar.encrypted_size`: Şifrelenmiş yedek boyutu (MB)
+- `backup.tar.compression_ratio`: Sıkıştırma oranı (%)
+- `backup.tar.speed`: Sıkıştırma hızı (MB/s)
+- `backup.tar.duration`: İşlem süresi (saniye)
+- `backup.tar.verify`: Doğrulama durumu (0/1)
+- `backup.tar.status`: Genel işlem durumu (0/1)
 
 ## Zabbix Monitoring
 

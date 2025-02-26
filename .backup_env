@@ -9,3 +9,5 @@ BACKUP_DIR="/home/pg_backup/backup"
 TEST_DB_NAME="verify_test_db"
 
 CHECKSUM_DIR="${BACKUP_DIR}/checksums"
+
+ENCRYPTION_KEY_FILE="/root/.backup_encryption_key"

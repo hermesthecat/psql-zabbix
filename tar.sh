@@ -3,7 +3,6 @@
 # Yapılandırma
 LOG_FILE="/var/log/backup_tar.log"
 ENV_FILE="/root/.backup_env"
-ENCRYPTION_KEY_FILE="/root/.backup_encryption_key"
 
 # Env dosyasını kontrol et
 if [ ! -f "$ENV_FILE" ]; then
