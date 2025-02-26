@@ -141,7 +141,15 @@ upload_to_pcloud() {
             fi
         fi
     else
-        local error_msg="HATA: pCloud yüklemesi başarısız! API Yanıtı: $response"
+        # Hata detaylarını ayıklayalım
+        local error_code=$(echo "$response" | grep -o '"result":[0-9]*' | cut -d':' -f2)
+        local error_msg=$(echo "$response" | grep -o '"error":"[^"]*"' | cut -d'"' -f4)
+        
+        echo "DEBUG: Upload API Yanıtı: $response" >> "$LOG_FILE"
+        echo "DEBUG: Upload Hata Kodu: $error_code" >> "$LOG_FILE"
+        echo "DEBUG: Upload Hata Mesajı: $error_msg" >> "$LOG_FILE"
+        
+        local error_msg="HATA: pCloud yüklemesi başarısız! Hata Kodu: $error_code, Mesaj: $error_msg"
         log_message "$error_msg"
         echo "$error_msg"
         send_to_zabbix "0" "pcloud.upload.status"
