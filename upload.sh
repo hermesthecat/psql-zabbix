@@ -39,18 +39,35 @@ log_message() {
 
 # pCloud'a login olma
 get_auth_token() {
-    local auth_response=$(curl -s "https://eapi.pcloud.com/userinfo?getauth=1&username=$PCLOUD_USERNAME&password=$PCLOUD_PASSWORD")
+    echo "DEBUG: pCloud login denemesi başlıyor..." >> "$LOG_FILE"
+    echo "DEBUG: Kullanılan endpoint: https://eapi.pcloud.com/userinfo" >> "$LOG_FILE"
+    echo "DEBUG: Kullanıcı adı uzunluğu: ${#PCLOUD_USERNAME}" >> "$LOG_FILE"
+    echo "DEBUG: Şifre uzunluğu: ${#PCLOUD_PASSWORD}" >> "$LOG_FILE"
+    
+    # Curl isteğini verbose modda yapalım ve logları saklayalım
+    local auth_response=$(curl -v \
+        "https://eapi.pcloud.com/userinfo?getauth=1&username=$PCLOUD_USERNAME&password=$PCLOUD_PASSWORD" \
+        2>> "$LOG_FILE")
+    
+    echo "DEBUG: API Yanıtı: $auth_response" >> "$LOG_FILE"
     
     if echo "$auth_response" | grep -q '"auth":'; then
         local auth_token=$(echo "$auth_response" | grep -o '"auth":"[^"]*"' | cut -d'"' -f4)
         if [ ! -z "$auth_token" ]; then
+            echo "DEBUG: Auth token başarıyla alındı" >> "$LOG_FILE"
             echo "$auth_token"
             return 0
         fi
     fi
     
-    log_message "HATA: pCloud login başarısız! API Yanıtı: $auth_response"
-    echo "HATA: pCloud login başarısız! API Yanıtı: $auth_response"
+    # Hata detaylarını ayıklayalım
+    local error_code=$(echo "$auth_response" | grep -o '"result":[0-9]*' | cut -d':' -f2)
+    local error_msg=$(echo "$auth_response" | grep -o '"error":"[^"]*"' | cut -d'"' -f4)
+    
+    echo "DEBUG: Hata kodu: $error_code" >> "$LOG_FILE"
+    echo "DEBUG: Hata mesajı: $error_msg" >> "$LOG_FILE"
+    
+    log_message "HATA: pCloud login başarısız! Hata Kodu: $error_code, Mesaj: $error_msg"
     return 1
 }
 
