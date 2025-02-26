@@ -17,6 +17,15 @@ send_to_zabbix() {
     zabbix_sender -z "$ZABBIX_SERVER" -s "$HOSTNAME" -k "backup.status" -o "$MESSAGE" >/dev/null 2>&1
 }
 
+# Log ve Zabbix'e mesaj gönderme
+log_message() {
+    local message=$1
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    echo "$timestamp - $message" >> "$LOG_FILE"
+    send_to_zabbix "$message" "backup.tar"
+}
+
+
 # PostgreSQL servis kontrolü
 check_postgresql() {
     if ! systemctl is-active --quiet postgresql; then
