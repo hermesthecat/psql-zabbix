@@ -1,232 +1,248 @@
-# PostgreSQL Yedekleme ve Doğrulama Sistemi
+# PostgreSQL Backup and Verification System
 
-Bu proje, PostgreSQL veritabanlarının otomatik yedeklenmesi, sıkıştırılması, yüklenmesi ve doğrulanması için geliştirilmiş bir script koleksiyonudur. Zabbix monitoring sistemi ile entegre çalışır.
+A comprehensive backup solution for PostgreSQL databases with automatic compression, encryption, cloud storage, and extensive verification capabilities.
 
-## Özellikler
+## Features
 
-- Otomatik PostgreSQL yedekleme
-- Günlük, haftalık ve aylık yedek rotasyonu
-- 7zip ile gelişmiş sıkıştırma (LZMA2)
-- AES-256 şifreleme ile güvenli yedekleme
-- pCloud entegrasyonu ile otomatik bulut yedekleme
-- Kapsamlı yedek doğrulama sistemi:
-  - 7zip bütünlük kontrolü
-  - Şifreleme doğrulama testi
-  - Test veritabanında restore denemesi
-- Zabbix entegrasyonu ile detaylı monitoring
-- Merkezi yapılandırma yönetimi
-- Detaylı loglama sistemi
-- Performans metrikleri ve raporlama
+### Core Functionality
+- Automated PostgreSQL database backups
+- AES-256 encryption with secure key management
+- LZMA2 compression for optimal storage
+- pCloud integration for secure cloud storage
+- Multi-layer backup verification system
+- Zabbix monitoring integration
+- Detailed logging and error tracking
 
-## Yedek Dosya Formatı
+### Backup Management
+- Daily, weekly, and monthly backup cycles
+- Automated backup rotation
+- Configurable retention policies
+- Backup size optimization
+- Progress tracking and reporting
 
-Sistem aşağıdaki formatta yedek dosyaları oluşturur:
+### Security Features
+- AES-256 encryption for all backups
+- Secure key management system
+- Encrypted headers for enhanced security
+- Permission-based access control
+- Secure credential handling
 
-1. **Dizin Yapısı**:
-   ```
-   /home/pg_backup/backup/
-   ├── daily/
-   │   ├── backup_YYYYMMDD/         # PostgreSQL dump dizini
-   │   └── backup_YYYYMMDD.7z       # Şifrelenmiş ve sıkıştırılmış yedek
-   ├── weekly/
-   │   └── backup_YYYYMMDD.7z
-   └── monthly/
-       └── backup_YYYYMMDD.7z
-   ```
+### Verification System
+- Archive integrity checking
+- Dual checksum verification (MD5, SHA256)
+- Test database restoration
+- Data consistency validation
+- Size and content verification
 
-2. **Dosya İsimlendirme**:
-   - Yedek dizini: `backup_YYYYMMDD`
-   - Sıkıştırılmış yedek: `backup_YYYYMMDD.7z`
-   - Örnek: `backup_20240226.7z`
+### Cloud Integration
+- Automated pCloud uploads
+- Transfer verification
+- Progress monitoring
+- Performance metrics
+- Retry mechanisms
 
-3. **Sıkıştırma ve Şifreleme**:
-   - Format: 7zip (.7z)
-   - Sıkıştırma: LZMA2
-   - Şifreleme: AES-256
-   - Başlık şifreleme: Aktif
+### Monitoring
+- Zabbix integration
+- Real-time status updates
+- Performance metrics
+- Error notifications
+- Resource usage tracking
 
-## Sistem Mimarisi
+## System Requirements
 
-### Script Yapısı
-- **fullbackup.sh**: Ana koordinatör script
-- **pgbackup.sh**: PostgreSQL yedekleme işlemleri
-- **tar.sh**: 7zip ile sıkıştırma ve şifreleme işlemleri
-- **upload.sh**: pCloud'a otomatik yükleme işlemleri
-- **verify_backup.sh**: Yedek doğrulama işlemleri
+### Operating System
+- Linux (Debian/Ubuntu or RHEL/CentOS)
+- Proper file permissions
+- Sudo access for installation
 
-### Yapılandırma Dosyaları
-- **/.backup_env**: Merkezi yapılandırma dosyası
-- **/.pgpass**: PostgreSQL kimlik bilgileri
-- **/.backup_encryption_key**: 7zip şifreleme anahtarı (otomatik oluşturulur)
+### Dependencies
+- PostgreSQL (9.6 or higher)
+- p7zip-full package
+- Zabbix agent
+- curl
+- bc
 
-### Log Dosyaları
-- **/var/log/backup_runner.log**: Ana yedekleme logları
-- **/var/log/backup_verify.log**: Doğrulama logları
-- **/var/log/backup_tar.log**: Sıkıştırma ve şifreleme logları
-- **/var/log/pcloud_upload.log**: pCloud yükleme logları
+### Storage
+- Sufficient disk space for local backups
+- pCloud account for cloud storage
+- Backup retention management
 
-## Kurulum
+## Installation
 
-1. Gerekli paketleri yükleyin:
+1. Clone the repository:
 ```bash
-# Debian/Ubuntu
-apt-get update
-apt-get install p7zip-full postgresql-client zabbix-agent
-
-# RHEL/CentOS
-yum install p7zip p7zip-plugins postgresql zabbix-agent
+git clone https://github.com/yourusername/psql-zabbix.git
+cd psql-zabbix
 ```
 
-2. Scriptleri kopyalayın:
+2. Configure environment variables:
 ```bash
-cp *.sh /root/
-chmod +x /root/*.sh
+cp .backup_env.example .backup_env
+nano .backup_env
 ```
 
-3. Dizinleri oluşturun:
+3. Set required permissions:
 ```bash
-mkdir -p /home/pg_backup/backup/{daily,weekly,monthly,checksums}
-mkdir -p /var/log
-touch /var/log/backup_{runner,verify,tar,pcloud_upload}.log
-chmod 640 /var/log/backup_*.log
+chmod 700 *.sh
+chmod 600 .backup_env
 ```
 
-4. Merkezi yapılandırma dosyasını oluşturun:
+4. Configure pCloud credentials:
 ```bash
-cat > /root/.backup_env << 'EOF'
-# pCloud Yapılandırması
+# Edit .backup_env with your pCloud credentials
 PCLOUD_USERNAME="your_username"
 PCLOUD_PASSWORD="your_password"
 PCLOUD_FOLDER_ID="your_folder_id"
-
-# Zabbix Yapılandırması
-ZABBIX_SERVER="10.10.10.10"
-HOSTNAME="Database-Master"
-
-# Yedekleme Yapılandırması
-BACKUP_DIR="/home/pg_backup/backup"
-TEST_DB_NAME="verify_test_db"
-CHECKSUM_DIR="${BACKUP_DIR}/checksums"
-
-# Şifreleme Yapılandırması
-ENCRYPTION_KEY_FILE="/root/.backup_encryption_key"
-EOF
-
-chmod 600 /root/.backup_env
 ```
 
-5. PostgreSQL bağlantı dosyasını oluşturun:
+5. Set up Zabbix monitoring:
 ```bash
-echo "localhost:5432:*:postgres:your_password" > ~/.pgpass
-chmod 600 ~/.pgpass
+# Configure Zabbix agent with provided templates
+# Edit zabbix_agentd.conf to include custom parameters
 ```
 
-## pCloud Yükleme Özellikleri
+## Configuration
 
-Sistem, yedekleri otomatik olarak pCloud'a yükler ve aşağıdaki özellikleri sunar:
+### Environment Variables
+- `PGPASSWORD`: PostgreSQL password
+- `BACKUP_DIR`: Backup storage directory
+- `ENCRYPTION_KEY_FILE`: Path to encryption key
+- `TEST_DB_NAME`: Database name for restore tests
+- `CHECKSUM_DIR`: Directory for checksum files
+- `ZABBIX_SERVER`: Zabbix server address
 
-1. **Otomatik Yedek Tespiti**:
-   - En son oluşturulan 7zip yedek dosyasını bulma
-   - Dosya boyutu ve tarih kontrolü
-   - Yükleme öncesi doğrulama
-
-2. **Performans İzleme**:
-   - Yükleme hızı (MB/s)
-   - İşlem süresi
-   - Dosya boyutu takibi
-
-3. **Hata Yönetimi**:
-   - Bağlantı hataları tespiti
-   - Yükleme başarısızlıkları
-   - Otomatik yeniden deneme (opsiyonel)
-
-4. **Zabbix Monitoring**:
-   - Yükleme durumu
-   - Performans metrikleri
-   - Hata bildirimleri
-
-## Monitoring Metrikleri
-
-### Yedekleme Metrikleri (backup.tar.*)
-- `original_size`: Orijinal yedek boyutu (MB)
-- `encrypted_size`: Şifrelenmiş yedek boyutu (MB)
-- `compression_ratio`: Sıkıştırma oranı (%)
-- `speed`: Sıkıştırma hızı (MB/s)
-- `duration`: İşlem süresi (saniye)
-- `verify`: Doğrulama durumu (0/1)
-- `status`: Genel işlem durumu (0/1)
-
-### pCloud Yükleme Metrikleri (pcloud.upload.*)
-- `size`: Yüklenen dosya boyutu (MB)
-- `speed`: Yükleme hızı (MB/s)
-- `duration`: Yükleme süresi (saniye)
-- `status`: Yükleme durumu (0/1)
-
-## Kullanım
-
-### Manuel Çalıştırma
+### Backup Schedule
+Configure cron jobs for automated backups:
 ```bash
-# Tam yedekleme döngüsü
-/root/fullbackup.sh
-
-# Sadece doğrulama
-/root/verify_backup.sh
-
-# Sadece pCloud'a yükleme
-/root/upload.sh
+# Example cron configuration
+0 1 * * * /root/fullbackup.sh # Daily backup at 1 AM
+0 2 * * 0 /root/weekly_backup.sh # Weekly backup at 2 AM on Sundays
+0 3 1 * * /root/monthly_backup.sh # Monthly backup at 3 AM on first day
 ```
 
-### Otomatik Çalıştırma (Cron)
+## Usage
+
+### Manual Backup
 ```bash
-# Günlük yedekleme (her gece 01:00'de)
-0 1 * * * /root/fullbackup.sh
-
-# Haftalık doğrulama (her Pazar 03:00'de)
-0 3 * * 0 /root/verify_backup.sh
-
-# Günlük pCloud yükleme (her gece 02:00'de)
-0 2 * * * /root/upload.sh
+./fullbackup.sh
 ```
 
-## Güvenlik Önlemleri
-
-1. **Dosya İzinleri**:
-   - Tüm yapılandırma dosyaları: `chmod 600`
-   - Script dosyaları: `chmod 700`
-   - Log dosyaları: `chmod 640`
-
-2. **Kimlik Bilgileri**:
-   - pCloud kimlik bilgileri şifreli saklanır
-   - Tüm hassas bilgiler `.backup_env` içinde tutulur
-   - Dosya izinleri kısıtlıdır
-
-3. **Yedek Güvenliği**:
-   - AES-256 şifreleme
-   - 7zip başlık şifreleme
-   - Şifreli transfer (pCloud API)
-
-## Yazar
-
-A. Kerem Gök
-
-## Lisans
-
-Bu proje GNU General Public License v3.0 altında lisanslanmıştır. 
-## Yedekleri Çözme
-
-Şifrelenmiş yedekleri çözmek için aşağıdaki adımları izleyin:
-
-1. Şifre çözme ve açma:
+### Verify Latest Backup
 ```bash
-# Şifreyi dosyadan okuyarak
-7z x -p"$(cat /root/.backup_encryption_key)" backup_YYYYMMDD.7z
-
-# veya şifreyi manuel girerek
-7z x backup_YYYYMMDD.7z
+./verify_backup.sh
 ```
 
-**Önemli Notlar**:
-- Şifreleme anahtarını (`/root/.backup_encryption_key`) kaybederseniz, yedekleri çözemezsiniz
-- Anahtarı güvenli bir ortamda yedekleyin
-- Yedek sunucularına anahtarı da taşımayı unutmayın
-- Şifreleme nedeniyle yedekleme süresi ve dosya boyutu bir miktar artacaktır 
+### Monitor Status
+```bash
+# Check Zabbix dashboard or log files
+tail -f /var/log/backup_runner.log
+tail -f /var/log/backup_verify.log
+tail -f /var/log/backup_tar.log
+tail -f /var/log/pcloud_upload.log
+```
+
+## System Architecture
+
+### Components
+1. **Backup Module** (pgbackup.sh)
+   - PostgreSQL dump operations
+   - Backup management
+   - Rotation handling
+
+2. **Security Module** (tar.sh)
+   - LZMA2 compression
+   - AES-256 encryption
+   - Header protection
+
+3. **Cloud Module** (upload.sh)
+   - pCloud API integration
+   - Transfer management
+   - Verification
+
+4. **Verification Module** (verify_backup.sh)
+   - Integrity checking
+   - Checksum validation
+   - Test restoration
+
+5. **Coordinator** (fullbackup.sh)
+   - Process orchestration
+   - Error handling
+   - Status reporting
+
+### File Structure
+```
+/
+├── root/
+│   ├── fullbackup.sh     # Main coordinator
+│   ├── pgbackup.sh       # PostgreSQL operations
+│   ├── tar.sh            # Compression/encryption
+│   ├── upload.sh         # pCloud integration
+│   └── verify_backup.sh  # Backup verification
+├── home/pg_backup/backup/
+│   ├── daily/           # Daily backups
+│   ├── weekly/          # Weekly backups
+│   ├── monthly/         # Monthly backups
+│   └── checksums/       # Verification digests
+└── var/log/
+    ├── backup_runner.log    # Main logs
+    ├── backup_verify.log   # Verification logs
+    ├── backup_tar.log     # Compression logs
+    └── pcloud_upload.log  # Upload logs
+```
+
+## Monitoring and Logging
+
+### Zabbix Integration
+- Backup status monitoring
+- Performance metrics tracking
+- Error notifications
+- Resource usage monitoring
+
+### Log Files
+- Detailed operation logs
+- Error tracking
+- Performance metrics
+- Status updates
+
+## Error Handling
+
+### Automatic Recovery
+- Retry mechanisms for failures
+- Cleanup of incomplete operations
+- Status notifications
+- Error reporting
+
+### Manual Intervention
+- Clear error messages
+- Detailed logs
+- Recovery procedures
+- Troubleshooting guides
+
+## Future Development
+
+### Planned Enhancements
+1. Parallel processing implementation
+2. Web management interface
+3. Multi-server support
+4. Advanced analytics
+5. Additional cloud providers
+6. Enhanced monitoring capabilities
+
+### Contributing
+Contributions are welcome! Please read our contributing guidelines and submit pull requests.
+
+## Support
+
+### Documentation
+- [System Architecture](docs/architecture.md)
+- [Configuration Guide](docs/configuration.md)
+- [Troubleshooting](docs/troubleshooting.md)
+
+### Contact
+For support and questions, please:
+- Open an issue in the repository
+- Contact the system administrator
+- Check the documentation
+
+## License
+This project is licensed under the MIT License - see the LICENSE file for details.
