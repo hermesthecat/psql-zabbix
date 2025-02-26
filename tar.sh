@@ -113,7 +113,7 @@ compress_and_encrypt_backup() {
 # Ana fonksiyon
 main() {
     # En son yedek dizinini bul
-    local latest_backup=$(find $BACKUP_DIR/daily -type d -name "backup_*" | sort -r | head -n 1)
+    local latest_backup=$(find $BACKUP_DIR/ -type d -name "backup_*" | sort -r | head -n 1)
     
     if [ -z "$latest_backup" ]; then
         log_message "HATA: Sıkıştırılacak yedek dizini bulunamadı!"
@@ -122,8 +122,9 @@ main() {
     fi
     
     # Hedef dosya adını oluştur
-    local backup_date=$(basename "$latest_backup" | cut -d'_' -f2)
-    local target_file="$BACKUP_DIR/daily/backup_${backup_date}.7z"
+    local datetime=$(date +%Y%m%d%H%M%S)
+    local backup_date=$(basename "$latest_backup" | cut -d'/' -f2)
+    local target_file="$ZIP_DIR/backup_${backup_date}_${datetime}.7z"
     
     log_message "Yedek sıkıştırma ve şifreleme işlemi başlatılıyor..."
     echo "Yedek sıkıştırma ve şifreleme işlemi başlatılıyor..."
