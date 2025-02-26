@@ -196,7 +196,11 @@ main() {
     local total_count=0
 
     # Her SQL dosyası için ayrı işlem yap
-    echo "$sql_files" | while read -r timestamp filepath; do
+    local IFS=$'\n'
+    while read -r line; do
+        local timestamp=$(echo "$line" | cut -d' ' -f1)
+        local filepath=$(echo "$line" | cut -d' ' -f2-)
+        
         if [ -n "$filepath" ]; then
             ((total_count++))
             
@@ -236,7 +240,7 @@ main() {
             # Geçici dizini temizle
             rm -rf "$temp_dir"
         fi
-    done
+    done <<< "$sql_files"
 
     # Sonuç raporu
     local summary="Toplam: $total_count dosya, Başarılı: $success_count, Başarısız: $((total_count - success_count))"
