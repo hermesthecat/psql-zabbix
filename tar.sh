@@ -141,53 +141,73 @@ main() {
     echo "Yedek dizini içeriği:" >> "$LOG_FILE"
     ls -la "$BACKUP_DIR" >> "$LOG_FILE"
 
-    # En son yedek dizinini bul (daha detaylı arama)
-    echo "Yedek dizini aranıyor: $BACKUP_DIR" >> "$LOG_FILE"
-    local latest_backup=$(find "$BACKUP_DIR" -maxdepth 1 -type d -name "*.sql" -printf '%T@ %p\n' | sort -nr | head -n1 | cut -d' ' -f2-)
+    # Tüm SQL dosyalarını bul
+    echo "SQL dosyaları aranıyor: $BACKUP_DIR/*.sql" >> "$LOG_FILE"
+    local sql_files=$(find "$BACKUP_DIR" -maxdepth 4 -type f -name "*.sql" -printf '%T@ %p\n' | sort -nr)
     
-    if [ -z "$latest_backup" ]; then
-        log_message "HATA: Sıkıştırılacak yedek dizini bulunamadı!"
-        echo "HATA: Sıkıştırılacak yedek dizini bulunamadı!"
+    if [ -z "$sql_files" ]; then
+        log_message "HATA: Hiç SQL yedek dosyası bulunamadı!"
+        echo "HATA: Hiç SQL yedek dosyası bulunamadı!"
         echo "Dizin içeriği:"
         ls -la "$BACKUP_DIR"
         exit 1
     fi
 
-    echo "Bulunan en son yedek: $latest_backup" >> "$LOG_FILE"
+    local success_count=0
+    local total_count=0
+
+    # Her SQL dosyası için ayrı işlem yap
+    echo "$sql_files" | while read timestamp filepath; do
+        if [ -n "$filepath" ]; then
+            ((total_count++))
+            
+            # SQL dosyasının boyutunu kontrol et
+            local file_size=$(du -sm "$filepath" | cut -f1)
+            local available_space=$(df -m "$ZIP_DIR" | tail -1 | awk '{print $4}')
+            
+            if [ $available_space -lt $file_size ]; then
+                log_message "HATA: $filepath için yeterli alan yok. Gerekli: ${file_size}MB, Mevcut: ${available_space}MB"
+                echo "HATA: $filepath için yeterli alan yok. Gerekli: ${file_size}MB, Mevcut: ${available_space}MB"
+                continue
+            fi
+            
+            # Dosya adından veritabanı adını çıkar
+            local db_name=$(basename "$filepath" .sql)
+            local datetime=$(date +%Y%m%d_%H%M%S)
+            local target_file="$ZIP_DIR/backup_${db_name}_${datetime}.7z"
+            
+            log_message "İşleniyor: $filepath"
+            echo "İşleniyor: $filepath"
+            
+            # Geçici bir dizin oluştur
+            local temp_dir="${BACKUP_DIR}/temp_${db_name}_${datetime}"
+            mkdir -p "$temp_dir"
+            cp "$filepath" "$temp_dir/"
+            
+            # Sıkıştırma ve şifreleme işlemini başlat
+            if compress_and_encrypt_backup "$temp_dir" "$target_file"; then
+                ((success_count++))
+                log_message "$filepath başarıyla sıkıştırıldı: $target_file"
+                echo "$filepath başarıyla sıkıştırıldı: $target_file"
+            else
+                log_message "HATA: $filepath sıkıştırma başarısız!"
+                echo "HATA: $filepath sıkıştırma başarısız!"
+            fi
+            
+            # Geçici dizini temizle
+            rm -rf "$temp_dir"
+        fi
+    done
+
+    # Sonuç raporu
+    local summary="Toplam: $total_count dosya, Başarılı: $success_count, Başarısız: $((total_count - success_count))"
+    log_message "$summary"
+    echo "$summary"
     
-    # Yedek dizininin yaşını kontrol et (24 saatten eski olmamalı)
-    local backup_age=$(find "$latest_backup" -maxdepth 0 -mtime +1)
-    if [ ! -z "$backup_age" ]; then
-        log_message "UYARI: En son yedek 24 saatten daha eski!"
-        echo "UYARI: En son yedek 24 saatten daha eski!"
-    fi
-    
-    # Hedef dizinde yeterli alan var mı kontrol et
-    local required_space=$(du -sm "$latest_backup" | cut -f1)
-    local available_space=$(df -m "$ZIP_DIR" | tail -1 | awk '{print $4}')
-    if [ $available_space -lt $required_space ]; then
-        log_message "HATA: Hedef dizinde yeterli alan yok. Gerekli: ${required_space}MB, Mevcut: ${available_space}MB"
-        echo "HATA: Hedef dizinde yeterli alan yok. Gerekli: ${required_space}MB, Mevcut: ${available_space}MB"
+    if [ $success_count -eq 0 ]; then
         exit 1
-    fi
-    
-    # Hedef dosya adını oluştur
-    local datetime=$(date +%Y%m%d_%H%M%S)
-    local backup_name=$(basename "$latest_backup" | cut -d'/' -f2)
-    local target_file="$ZIP_DIR/backup_${backup_name}_${datetime}.7z"
-    
-    log_message "Yedek sıkıştırma ve şifreleme işlemi başlatılıyor..."
-    echo "Yedek sıkıştırma ve şifreleme işlemi başlatılıyor..."
-    
-    # Sıkıştırma ve şifreleme işlemini başlat
-    if compress_and_encrypt_backup "$latest_backup" "$target_file"; then
-        log_message "Yedek sıkıştırma ve şifreleme işlemi başarıyla tamamlandı"
-        echo "Yedek sıkıştırma ve şifreleme işlemi başarıyla tamamlandı"
-        exit 0
     else
-        log_message "Yedek sıkıştırma ve şifreleme işlemi başarısız!"
-        echo "Yedek sıkıştırma ve şifreleme işlemi başarısız!"
-        exit 1
+        exit 0
     fi
 }
 
