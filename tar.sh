@@ -76,7 +76,7 @@ calculate_compression_ratio() {
 compress_and_encrypt_backup() {
     local source_dir=$1
     local target_file=$2
-    local compression_speed=${3:-"ultra"}  # Varsayılan: fast
+    local compression_speed=${3:-"fast"}  # Varsayılan: fast
     local password=$(cat "$ENCRYPTION_KEY_FILE")
     local start_time=$(date +%s)
     
@@ -153,14 +153,14 @@ compress_and_encrypt_backup() {
 # Ana fonksiyon
 main() {
     # Sıkıştırma hızını kontrol et (env dosyasından veya varsayılan)
-    local compression_speed=${COMPRESSION_SPEED:-"ultra"}
+    local compression_speed=${COMPRESSION_SPEED:-"fast"}
     
     # Geçerli bir sıkıştırma hızı mı kontrol et
     case "$compression_speed" in
         "ultra"|"fast"|"max") ;;
         *)
-            log_message "UYARI: Geçersiz sıkıştırma hızı '$compression_speed'. Varsayılan 'ultra' kullanılıyor."
-            compression_speed="ultra"
+            log_message "UYARI: Geçersiz sıkıştırma hızı '$compression_speed'. Varsayılan 'fast' kullanılıyor."
+            compression_speed="fast"
             ;;
     esac
     
