@@ -9,6 +9,9 @@ if [ ! -f "$ENV_FILE" ]; then
     exit 1
 fi
 
+# Log dosyasını temizle
+rm -f "$LOG_FILE"
+
 # Env dosyasını yükle
 source "$ENV_FILE"
 
