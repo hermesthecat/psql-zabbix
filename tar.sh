@@ -143,7 +143,7 @@ main() {
 
     # Tüm SQL dosyalarını bul
     echo "SQL dosyaları aranıyor: $BACKUP_DIR/*.sql" >> "$LOG_FILE"
-    local sql_files=$(find "$BACKUP_DIR" -maxdepth 4 -type f -name "*.sql" -printf '%T@ %p\n' | sort -nr)
+    local sql_files=$(find "$BACKUP_DIR" -maxdepth 4 -type f -name "*.sql" -mmin -1440 -printf '%T@ %p\n' | sort -nr)
     
     if [ -z "$sql_files" ]; then
         log_message "HATA: Hiç SQL yedek dosyası bulunamadı!"
