@@ -131,14 +131,29 @@ compress_and_encrypt_backup() {
 
 # Ana fonksiyon
 main() {
-    # En son yedek dizinini bul
-    local latest_backup=$(find $BACKUP_DIR/ -type d -name "backup_*" | sort -r | head -n 1)
+    # BACKUP_DIR içeriğini kontrol et ve logla
+    if [ ! -d "$BACKUP_DIR" ]; then
+        log_message "HATA: $BACKUP_DIR dizini mevcut değil!"
+        echo "HATA: $BACKUP_DIR dizini mevcut değil!"
+        exit 1
+    fi
+
+    echo "Yedek dizini içeriği:" >> "$LOG_FILE"
+    ls -la "$BACKUP_DIR" >> "$LOG_FILE"
+
+    # En son yedek dizinini bul (daha detaylı arama)
+    echo "Yedek dizini aranıyor: $BACKUP_DIR/*backup*" >> "$LOG_FILE"
+    local latest_backup=$(find "$BACKUP_DIR" -maxdepth 1 -type d -name "**" -printf '%T@ %p\n' | sort -nr | head -n1 | cut -d' ' -f2-)
     
     if [ -z "$latest_backup" ]; then
         log_message "HATA: Sıkıştırılacak yedek dizini bulunamadı!"
         echo "HATA: Sıkıştırılacak yedek dizini bulunamadı!"
+        echo "Dizin içeriği:"
+        ls -la "$BACKUP_DIR"
         exit 1
     fi
+
+    echo "Bulunan en son yedek: $latest_backup" >> "$LOG_FILE"
     
     # Yedek dizininin yaşını kontrol et (24 saatten eski olmamalı)
     local backup_age=$(find "$latest_backup" -maxdepth 0 -mtime +1)

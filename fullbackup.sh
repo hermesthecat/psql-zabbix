@@ -35,14 +35,6 @@ check_postgresql() {
         return 1
     fi
     
-    # PostgreSQL'e bağlanabilme kontrolü
-    if ! psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c '\q' >/dev/null 2>&1; then
-        log_message "HATA: PostgreSQL'e bağlanılamıyor!"
-        echo "HATA: PostgreSQL'e bağlanılamıyor!"
-        send_to_zabbix "PostgreSQL'e bağlanılamıyor" "backup.postgresql_status"
-        return 1
-    fi
-    
     return 0
 }
 
