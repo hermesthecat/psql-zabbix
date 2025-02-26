@@ -18,6 +18,33 @@ Bu proje, PostgreSQL veritabanlarının otomatik yedeklenmesi, sıkıştırılma
 - Detaylı loglama sistemi
 - Performans metrikleri ve raporlama
 
+## Yedek Dosya Formatı
+
+Sistem aşağıdaki formatta yedek dosyaları oluşturur:
+
+1. **Dizin Yapısı**:
+   ```
+   /home/pg_backup/backup/
+   ├── daily/
+   │   ├── backup_YYYYMMDD/         # PostgreSQL dump dizini
+   │   └── backup_YYYYMMDD.7z       # Şifrelenmiş ve sıkıştırılmış yedek
+   ├── weekly/
+   │   └── backup_YYYYMMDD.7z
+   └── monthly/
+       └── backup_YYYYMMDD.7z
+   ```
+
+2. **Dosya İsimlendirme**:
+   - Yedek dizini: `backup_YYYYMMDD`
+   - Sıkıştırılmış yedek: `backup_YYYYMMDD.7z`
+   - Örnek: `backup_20240226.7z`
+
+3. **Sıkıştırma ve Şifreleme**:
+   - Format: 7zip (.7z)
+   - Sıkıştırma: LZMA2
+   - Şifreleme: AES-256
+   - Başlık şifreleme: Aktif
+
 ## Sistem Mimarisi
 
 ### Script Yapısı
@@ -190,14 +217,13 @@ Bu proje GNU General Public License v3.0 altında lisanslanmıştır.
 
 Şifrelenmiş yedekleri çözmek için aşağıdaki adımları izleyin:
 
-1. Şifre çözme:
+1. Şifre çözme ve açma:
 ```bash
-openssl enc -d -aes-256-cbc -in backup_TARIH.tar.gz.enc -out backup_TARIH.tar.gz -pass file:/root/.backup_encryption_key
-```
+# Şifreyi dosyadan okuyarak
+7z x -p"$(cat /root/.backup_encryption_key)" backup_YYYYMMDD.7z
 
-2. Arşivi açma:
-```bash
-tar -xzf backup_TARIH.tar.gz
+# veya şifreyi manuel girerek
+7z x backup_YYYYMMDD.7z
 ```
 
 **Önemli Notlar**:

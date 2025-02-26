@@ -123,7 +123,7 @@ main() {
     
     # Hedef dosya adını oluştur
     local backup_date=$(basename "$latest_backup" | cut -d'_' -f2)
-    local target_file="$BACKUP_DIR/daily/backup_${backup_date}.tar.gz.enc"
+    local target_file="$BACKUP_DIR/daily/backup_${backup_date}.7z"
     
     log_message "Yedek sıkıştırma ve şifreleme işlemi başlatılıyor..."
     echo "Yedek sıkıştırma ve şifreleme işlemi başlatılıyor..."

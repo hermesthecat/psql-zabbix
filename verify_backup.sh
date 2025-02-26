@@ -25,40 +25,46 @@ log_message() {
 
 # En son yedek dosyasını bulma
 find_latest_backup() {
-    local latest_backup=$(find $BACKUP_DIR/daily -type f -name "*.sql.bz2" -o -name "*.sql.gz" | sort -r | head -n 1)
+    local latest_backup=$(find $BACKUP_DIR/daily -type f -name "backup_*.7z" | sort -r | head -n 1)
     echo "$latest_backup"
 }
 
 # Yedek dosyasının bütünlüğünü kontrol etme
 verify_backup_integrity() {
     local backup_file=$1
-    local file_type=$(file -b "$backup_file")
+    local password=$(cat "$ENCRYPTION_KEY_FILE")
     
-    if [[ $backup_file == *.bz2 ]]; then
-        bzip2 -t "$backup_file" 2>/dev/null
-        return $?
-    elif [[ $backup_file == *.gz ]]; then
-        gzip -t "$backup_file" 2>/dev/null
-        return $?
-    else
-        return 1
-    fi
+    # 7zip bütünlük kontrolü
+    7z t -p"$password" "$backup_file" >/dev/null 2>&1
+    return $?
 }
 
 # Yedek içeriğini test etme
 test_backup_restore() {
     local backup_file=$1
     local temp_dir=$(mktemp -d)
+    local password=$(cat "$ENCRYPTION_KEY_FILE")
     local success=0
     
     log_message "Test restore başlatılıyor: $backup_file"
     echo "Test restore başlatılıyor: $backup_file"
     
-    # Yedek dosyasını geçici dizine açma
-    if [[ $backup_file == *.bz2 ]]; then
-        bunzip2 -c "$backup_file" > "$temp_dir/dump.sql"
-    elif [[ $backup_file == *.gz ]]; then
-        gunzip -c "$backup_file" > "$temp_dir/dump.sql"
+    # 7zip arşivini geçici dizine aç
+    7z x -p"$password" -o"$temp_dir" "$backup_file" >/dev/null 2>&1
+    if [ $? -ne 0 ]; then
+        log_message "HATA: Yedek dosyası açılamadı"
+        echo "HATA: Yedek dosyası açılamadı"
+        rm -rf "$temp_dir"
+        return 1
+    fi
+    
+    # SQL dosyasını bul
+    local sql_file=$(find "$temp_dir" -type f -name "*.sql" | head -n 1)
+    if [ -z "$sql_file" ]; then
+        log_message "HATA: SQL dosyası bulunamadı"
+        echo "HATA: SQL dosyası bulunamadı"
+        rm -rf "$temp_dir"
+        return 1
     fi
     
     # Test veritabanı oluşturma
@@ -67,7 +73,7 @@ test_backup_restore() {
     
     if [ $? -eq 0 ]; then
         # Yedeği test veritabanına yükleme
-        PGPASSWORD=$PGPASSWORD psql -h localhost -U postgres -d "$TEST_DB_NAME" -f "$temp_dir/dump.sql" >/dev/null 2>&1
+        PGPASSWORD=$PGPASSWORD psql -h localhost -U postgres -d "$TEST_DB_NAME" -f "$sql_file" >/dev/null 2>&1
         if [ $? -eq 0 ]; then
             # Veritabanı boyutunu ve tablo sayısını kontrol etme
             local db_size=$(PGPASSWORD=$PGPASSWORD psql -h localhost -U postgres -d "$TEST_DB_NAME" -t -c "SELECT pg_size_pretty(pg_database_size('$TEST_DB_NAME'));")
