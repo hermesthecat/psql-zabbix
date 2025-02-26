@@ -8,15 +8,15 @@ Bu proje, PostgreSQL veritabanlarının otomatik yedeklenmesi, sıkıştırılma
 - Günlük, haftalık ve aylık yedek rotasyonu
 - 7zip ile gelişmiş sıkıştırma (LZMA2)
 - AES-256 şifreleme ile güvenli yedekleme
-- Uzak sunucuya yedek yükleme
-- pCloud entegrasyonu
+- pCloud entegrasyonu ile otomatik bulut yedekleme
 - Kapsamlı yedek doğrulama sistemi:
   - 7zip bütünlük kontrolü
   - Şifreleme doğrulama testi
   - Test veritabanında restore denemesi
-- Zabbix entegrasyonu ile monitoring
+- Zabbix entegrasyonu ile detaylı monitoring
 - Merkezi yapılandırma yönetimi
 - Detaylı loglama sistemi
+- Performans metrikleri ve raporlama
 
 ## Sistem Mimarisi
 
@@ -24,14 +24,12 @@ Bu proje, PostgreSQL veritabanlarının otomatik yedeklenmesi, sıkıştırılma
 - **fullbackup.sh**: Ana koordinatör script
 - **pgbackup.sh**: PostgreSQL yedekleme işlemleri
 - **tar.sh**: 7zip ile sıkıştırma ve şifreleme işlemleri
-- **upload.sh**: Uzak sunucuya yükleme işlemleri
-- **pcloud.sh**: pCloud'a yükleme işlemleri
+- **upload.sh**: pCloud'a otomatik yükleme işlemleri
 - **verify_backup.sh**: Yedek doğrulama işlemleri
 
 ### Yapılandırma Dosyaları
 - **/.backup_env**: Merkezi yapılandırma dosyası
 - **/.pgpass**: PostgreSQL kimlik bilgileri
-- **/.pcloud_credentials**: pCloud kimlik bilgileri (opsiyonel)
 - **/.backup_encryption_key**: 7zip şifreleme anahtarı (otomatik oluşturulur)
 
 ### Log Dosyaları
@@ -62,25 +60,29 @@ chmod +x /root/*.sh
 ```bash
 mkdir -p /home/pg_backup/backup/{daily,weekly,monthly,checksums}
 mkdir -p /var/log
-touch /var/log/backup_{runner,verify,tar}.log
-touch /var/log/pcloud_upload.log
+touch /var/log/backup_{runner,verify,tar,pcloud_upload}.log
 chmod 640 /var/log/backup_*.log
 ```
 
 4. Merkezi yapılandırma dosyasını oluşturun:
 ```bash
 cat > /root/.backup_env << 'EOF'
+# pCloud Yapılandırması
 PCLOUD_USERNAME="your_username"
 PCLOUD_PASSWORD="your_password"
+PCLOUD_FOLDER_ID="your_folder_id"
 
+# Zabbix Yapılandırması
 ZABBIX_SERVER="10.10.10.10"
 HOSTNAME="Database-Master"
 
+# Yedekleme Yapılandırması
 BACKUP_DIR="/home/pg_backup/backup"
-
 TEST_DB_NAME="verify_test_db"
-
 CHECKSUM_DIR="${BACKUP_DIR}/checksums"
+
+# Şifreleme Yapılandırması
+ENCRYPTION_KEY_FILE="/root/.backup_encryption_key"
 EOF
 
 chmod 600 /root/.backup_env
@@ -92,23 +94,46 @@ echo "localhost:5432:*:postgres:your_password" > ~/.pgpass
 chmod 600 ~/.pgpass
 ```
 
-6. Şifreleme anahtarı otomatik olarak oluşturulacaktır:
-   - İlk çalıştırmada `/root/.backup_encryption_key` dosyası oluşturulur
-   - 32 karakterlik rastgele şifre üretilir
-   - Dosya izinleri 600 olarak ayarlanır (sadece root okuyabilir)
-   - **ÖNEMLİ**: Bu şifreyi güvenli bir yerde yedeklemeyi unutmayın!
+## pCloud Yükleme Özellikleri
 
-## 7zip Sıkıştırma ve Şifreleme Parametreleri
+Sistem, yedekleri otomatik olarak pCloud'a yükler ve aşağıdaki özellikleri sunar:
 
-Sistem, yedekleri sıkıştırmak ve şifrelemek için 7zip kullanır. Kullanılan parametreler:
+1. **Otomatik Yedek Tespiti**:
+   - En son oluşturulan 7zip yedek dosyasını bulma
+   - Dosya boyutu ve tarih kontrolü
+   - Yükleme öncesi doğrulama
 
-- `-t7z`: 7z formatını kullanır
-- `-m0=lzma2`: LZMA2 sıkıştırma algoritması (yüksek sıkıştırma oranı)
-- `-mx=9`: En yüksek sıkıştırma seviyesi
-- `-mfb=64`: 64 kelimelik sözcük boyutu
-- `-md=32m`: 32MB sözlük boyutu (daha iyi sıkıştırma)
-- `-ms=on`: Katı sıkıştırma modu
-- `-mhe=on`: Başlık şifreleme aktif (ekstra güvenlik)
+2. **Performans İzleme**:
+   - Yükleme hızı (MB/s)
+   - İşlem süresi
+   - Dosya boyutu takibi
+
+3. **Hata Yönetimi**:
+   - Bağlantı hataları tespiti
+   - Yükleme başarısızlıkları
+   - Otomatik yeniden deneme (opsiyonel)
+
+4. **Zabbix Monitoring**:
+   - Yükleme durumu
+   - Performans metrikleri
+   - Hata bildirimleri
+
+## Monitoring Metrikleri
+
+### Yedekleme Metrikleri (backup.tar.*)
+- `original_size`: Orijinal yedek boyutu (MB)
+- `encrypted_size`: Şifrelenmiş yedek boyutu (MB)
+- `compression_ratio`: Sıkıştırma oranı (%)
+- `speed`: Sıkıştırma hızı (MB/s)
+- `duration`: İşlem süresi (saniye)
+- `verify`: Doğrulama durumu (0/1)
+- `status`: Genel işlem durumu (0/1)
+
+### pCloud Yükleme Metrikleri (pcloud.upload.*)
+- `size`: Yüklenen dosya boyutu (MB)
+- `speed`: Yükleme hızı (MB/s)
+- `duration`: Yükleme süresi (saniye)
+- `status`: Yükleme durumu (0/1)
 
 ## Kullanım
 
@@ -119,6 +144,9 @@ Sistem, yedekleri sıkıştırmak ve şifrelemek için 7zip kullanır. Kullanıl
 
 # Sadece doğrulama
 /root/verify_backup.sh
+
+# Sadece pCloud'a yükleme
+/root/upload.sh
 ```
 
 ### Otomatik Çalıştırma (Cron)
@@ -128,183 +156,10 @@ Sistem, yedekleri sıkıştırmak ve şifrelemek için 7zip kullanır. Kullanıl
 
 # Haftalık doğrulama (her Pazar 03:00'de)
 0 3 * * 0 /root/verify_backup.sh
+
+# Günlük pCloud yükleme (her gece 02:00'de)
+0 2 * * * /root/upload.sh
 ```
-
-## Monitoring
-
-Sistem, Zabbix ile entegre çalışır ve aşağıdaki metrikleri gönderir:
-
-- `backup.tar.original_size`: Orijinal yedek boyutu (MB)
-- `backup.tar.encrypted_size`: Şifrelenmiş yedek boyutu (MB)
-- `backup.tar.compression_ratio`: Sıkıştırma oranı (%)
-- `backup.tar.speed`: Sıkıştırma hızı (MB/s)
-- `backup.tar.duration`: İşlem süresi (saniye)
-- `backup.tar.verify`: Doğrulama durumu (0/1)
-- `backup.tar.status`: Genel işlem durumu (0/1)
-
-## Zabbix Monitoring
-
-### Metrik Grupları
-
-1. **Yedekleme Durumu** (backup.status):
-   - Genel yedekleme durumu
-   - Adım adım ilerleme
-   - Hata bildirimleri
-
-2. **Doğrulama Metrikleri** (backup.verify):
-   - Checksum kontrolleri
-   - Restore testleri
-   - Bütünlük doğrulaması
-
-3. **Sıkıştırma Metrikleri** (backup.tar):
-   - Orijinal boyut (MB)
-   - Şifrelenmiş boyut (MB)
-   - Sıkıştırma oranı (%)
-   - İşlem hızı (MB/s)
-   - İşlem süresi (s)
-   - Şifreleme durumu
-
-4. **pCloud Metrikleri** (pcloud.upload):
-   - Yükleme boyutu (MB)
-   - Transfer hızı (MB/s)
-   - İşlem süresi (s)
-   - Hata durumları
-
-### Önerilen Triggerlar ve Alarmlar
-
-1. **Yedekleme Durumu Alarmları**:
-```
-# Yedekleme hatası
-Name: Backup Error on {HOST.NAME}
-Expression: {HOST.NAME:backup.status.str("ERROR")}=1
-Priority: High
-Description: Yedekleme işlemi sırasında hata oluştu. Lütfen /var/log/backup_runner.log dosyasını kontrol edin.
-
-# Yedekleme uzun sürüyor
-Name: Backup Taking Too Long on {HOST.NAME}
-Expression: {HOST.NAME:backup.status.str("started")}>0 and {HOST.NAME:backup.status.nodata(3600)}=1
-Priority: Warning
-Description: Yedekleme işlemi 1 saatten uzun süredir devam ediyor veya takılmış olabilir.
-
-# Yedekleme başlamadı
-Name: Backup Not Started on {HOST.NAME}
-Expression: {HOST.NAME:backup.status.nodata(86400)}=1
-Priority: High
-Description: Son 24 saat içinde yedekleme işlemi başlatılmadı.
-```
-
-2. **Doğrulama Alarmları**:
-```
-# Doğrulama hatası
-Name: Backup Verification Failed on {HOST.NAME}
-Expression: {HOST.NAME:backup.verify.str("HATA")}=1
-Priority: High
-Description: Yedek doğrulama işlemi başarısız. Detaylar için /var/log/backup_verify.log dosyasını kontrol edin.
-
-# Checksum hatası
-Name: Backup Checksum Mismatch on {HOST.NAME}
-Expression: {HOST.NAME:backup.verify.str("checksum eşleşmiyor")}=1
-Priority: High
-Description: Yedek dosyasının checksum değerleri eşleşmiyor. Dosya bozulmuş olabilir.
-
-# Restore testi başarısız
-Name: Backup Restore Test Failed on {HOST.NAME}
-Expression: {HOST.NAME:backup.verify.str("restore başarısız")}=1
-Priority: High
-Description: Test veritabanına restore işlemi başarısız oldu.
-```
-
-3. **Sıkıştırma ve Şifreleme Performans Alarmları**:
-```
-# Düşük sıkıştırma oranı
-Name: Low Compression Ratio on {HOST.NAME}
-Expression: {HOST.NAME:backup.tar.compression_ratio.last()}<30
-Priority: Warning
-Description: Sıkıştırma oranı %30'un altında. Yedek dosyaları beklenenden büyük olabilir.
-
-# Düşük işlem hızı
-Name: Slow Encryption Speed on {HOST.NAME}
-Expression: {HOST.NAME:backup.tar.speed.last()}<5
-Priority: Warning
-Description: Şifreleme ve sıkıştırma hızı 5MB/s'nin altında. Sistem performans sorunu olabilir.
-
-# Uzun işlem süresi
-Name: Encryption Taking Too Long on {HOST.NAME}
-Expression: {HOST.NAME:backup.tar.duration.last()}>1800
-Priority: Warning
-Description: Şifreleme ve sıkıştırma işlemi 30 dakikadan uzun sürdü.
-
-# Şifreleme hatası
-Name: Encryption Error on {HOST.NAME}
-Expression: {HOST.NAME:backup.tar.str("HATA")}=1
-Priority: High
-Description: Şifreleme işlemi sırasında hata oluştu.
-
-# Şifreleme doğrulama hatası
-Name: Encryption Verification Failed on {HOST.NAME}
-Expression: {HOST.NAME:backup.tar.str("şifreleme doğrulama")}=1
-Priority: High
-Description: Şifreleme doğrulama testi başarısız oldu.
-```
-
-4. **pCloud Yükleme Alarmları**:
-```
-# Düşük yükleme hızı
-Name: Slow pCloud Upload Speed on {HOST.NAME}
-Expression: {HOST.NAME:pcloud.upload.speed.last()}<0.5
-Priority: Warning
-Description: pCloud yükleme hızı 0.5MB/s'nin altında. İnternet bağlantısını kontrol edin.
-
-# Uzun yükleme süresi
-Name: pCloud Upload Taking Too Long on {HOST.NAME}
-Expression: {HOST.NAME:pcloud.upload.duration.last()}>7200
-Priority: Warning
-Description: pCloud yüklemesi 2 saatten uzun süredir devam ediyor.
-
-# Yükleme hatası
-Name: pCloud Upload Error on {HOST.NAME}
-Expression: {HOST.NAME:pcloud.upload.str("HATA")}=1
-Priority: High
-Description: pCloud yükleme işlemi başarısız oldu.
-
-# Boyut eşleşmeme hatası
-Name: pCloud File Size Mismatch on {HOST.NAME}
-Expression: {HOST.NAME:pcloud.upload.str("boyutu eşleşmiyor")}=1
-Priority: High
-Description: Yüklenen dosyanın boyutu pCloud'daki dosya boyutu ile eşleşmiyor.
-```
-
-5. **Disk Alan Kullanımı Alarmları**:
-```
-# Yedek dizini dolmak üzere
-Name: Backup Directory Running Out of Space on {HOST.NAME}
-Expression: {HOST.NAME:vfs.fs.size[/home/pg_backup/backup,pfree].last()}<10
-Priority: High
-Description: Yedekleme dizininde %10'dan az boş alan kaldı.
-
-# Log dizini dolmak üzere
-Name: Log Directory Running Out of Space on {HOST.NAME}
-Expression: {HOST.NAME:vfs.fs.size[/var/log,pfree].last()}<10
-Priority: Warning
-Description: Log dizininde %10'dan az boş alan kaldı.
-```
-
-Her trigger için önerilen eylemler:
-
-1. **High Priority Alarmlar**:
-   - SMS/Telefon bildirimi
-   - E-posta bildirimi
-   - Ticket oluşturma
-   - Yedekleme işlemini durdurma (opsiyonel)
-
-2. **Warning Priority Alarmlar**:
-   - E-posta bildirimi
-   - Slack/Teams bildirimi
-   - Günlük raporda gösterme
-
-3. **Information Priority Alarmlar**:
-   - Günlük raporda gösterme
-   - Dashboard'da gösterme
 
 ## Güvenlik Önlemleri
 
@@ -313,45 +168,15 @@ Her trigger için önerilen eylemler:
    - Script dosyaları: `chmod 700`
    - Log dosyaları: `chmod 640`
 
-2. **Dizin İzinleri**:
-   - Yedekleme dizini: `chmod 750`
-   - Log dizini: `chmod 755`
-
-3. **Kimlik Bilgileri Yönetimi**:
-   - Tüm kimlik bilgileri `.backup_env` dosyasında merkezi olarak saklanır
+2. **Kimlik Bilgileri**:
+   - pCloud kimlik bilgileri şifreli saklanır
+   - Tüm hassas bilgiler `.backup_env` içinde tutulur
    - Dosya izinleri kısıtlıdır
-   - Hassas bilgiler şifrelenir (opsiyonel)
 
-## Bakım
-
-1. **Log Rotasyonu**:
-```
-/etc/logrotate.d/backup_logs:
-/var/log/backup_*.log {
-    weekly
-    rotate 12
-    compress
-    delaycompress
-    missingok
-    notifempty
-    create 640 root root
-}
-```
-
-2. **Eski Yedeklerin Temizlenmesi**:
-```bash
-# Günlük yedekler (30 gün)
-find /home/pg_backup/backup/daily -type f -mtime +30 -delete
-
-# Haftalık yedekler (12 hafta)
-find /home/pg_backup/backup/weekly -type f -mtime +84 -delete
-
-# Aylık yedekler (6 ay)
-find /home/pg_backup/backup/monthly -type f -mtime +180 -delete
-
-# Checksum dosyaları (90 gün)
-find /home/pg_backup/backup/checksums -type f -mtime +90 -delete
-```
+3. **Yedek Güvenliği**:
+   - AES-256 şifreleme
+   - 7zip başlık şifreleme
+   - Şifreli transfer (pCloud API)
 
 ## Yazar
 

@@ -4,20 +4,101 @@
 LOG_FILE="/var/log/pcloud_upload.log"
 ENV_FILE="/root/.backup_env"
 
-# Kimlik bilgilerini yükle
-if [ -f "$ENV_FILE" ]; then
-    source "$ENV_FILE"
-else
-    echo "HATA: pCloud kimlik bilgileri dosyası bulunamadı: $ENV_FILE"
+# Env dosyasını kontrol et
+if [ ! -f "$ENV_FILE" ]; then
+    echo "HATA: Env dosyası bulunamadı: $ENV_FILE"
     exit 1
 fi
 
-# Yedek dosyasını oluştur
-cp /home/zipbackup/DB-Backup_All.tar.gz /home/zipbackup/DB-Backup_All.$(date +%y)$(date +%m)$(date +%d).tar.gz
+# Env dosyasını yükle
+source "$ENV_FILE"
 
-# PCloud'a yükle
-./pcloud.sh /home/zipbackup/DB-Backup_All.$(date +%y)$(date +%m)$(date +%d).tar.gz 11111111111
+# Zabbix'e bildirim gönderme fonksiyonu
+send_to_zabbix() {
+    MESSAGE=$1
+    KEY=$2
+    zabbix_sender -z "$ZABBIX_SERVER" -s "$HOSTNAME" -k "$KEY" -o "$MESSAGE" >/dev/null 2>&1
+}
 
-# Yedek dosyasını temizle
-rm -rf /home/zipbackup/DB-Backup_All.*
+# Log ve Zabbix'e mesaj gönderme
+log_message() {
+    local message=$1
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    echo "$timestamp - $message" >> "$LOG_FILE"
+    send_to_zabbix "$message" "pcloud.upload"
+}
+
+# Dosya boyutunu alma (MB cinsinden)
+get_file_size() {
+    local file=$1
+    local size=$(du -m "$file" | cut -f1)
+    echo "$size"
+}
+
+# pCloud'a yükleme işlemi
+upload_to_pcloud() {
+    local source_file=$1
+    local start_time=$(date +%s)
+    
+    # Dosya boyutunu al
+    local file_size=$(get_file_size "$source_file")
+    log_message "pCloud yükleme başlıyor: $source_file (Boyut: ${file_size}MB)"
+    echo "pCloud yükleme başlıyor: $source_file (Boyut: ${file_size}MB)"
+    send_to_zabbix "$file_size" "pcloud.upload.size"
+    
+    # pCloud'a yükle
+    ./pcloud.sh "$source_file" "$PCLOUD_FOLDER_ID" >/dev/null 2>&1
+    local upload_status=$?
+    
+    if [ $upload_status -eq 0 ]; then
+        # Bitiş zamanı ve süre hesaplama
+        local end_time=$(date +%s)
+        local duration=$((end_time - start_time))
+        local speed=$(echo "scale=2; $file_size / $duration" | bc)
+        
+        local success_msg="pCloud yükleme başarılı: ${file_size}MB (Hız: ${speed}MB/s, Süre: ${duration}s)"
+        log_message "$success_msg"
+        echo "$success_msg"
+        
+        # Metrikleri Zabbix'e gönder
+        send_to_zabbix "$speed" "pcloud.upload.speed"
+        send_to_zabbix "$duration" "pcloud.upload.duration"
+        send_to_zabbix "1" "pcloud.upload.status"
+        return 0
+    else
+        log_message "HATA: pCloud yükleme başarısız: $source_file"
+        echo "HATA: pCloud yükleme başarısız: $source_file"
+        send_to_zabbix "0" "pcloud.upload.status"
+        return 1
+    fi
+}
+
+# Ana fonksiyon
+main() {
+    # En son şifrelenmiş yedeği bul
+    local latest_backup=$(find $BACKUP_DIR/daily -type f -name "backup_*.7z" | sort -r | head -n 1)
+    
+    if [ -z "$latest_backup" ]; then
+        log_message "HATA: Yüklenecek yedek dosyası bulunamadı!"
+        echo "HATA: Yüklenecek yedek dosyası bulunamadı!"
+        exit 1
+    fi
+    
+    log_message "pCloud yükleme işlemi başlatılıyor..."
+    echo "pCloud yükleme işlemi başlatılıyor..."
+    
+    # pCloud'a yükleme işlemini başlat
+    if upload_to_pcloud "$latest_backup"; then
+        log_message "pCloud yükleme işlemi başarıyla tamamlandı"
+        echo "pCloud yükleme işlemi başarıyla tamamlandı"
+        exit 0
+    else
+        log_message "pCloud yükleme işlemi başarısız!"
+        echo "pCloud yükleme işlemi başarısız!"
+        exit 1
+    fi
+}
+
+# Scripti çalıştır
+main
 

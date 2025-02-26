@@ -1,5 +1,6 @@
 PCLOUD_USERNAME="your_username"
 PCLOUD_PASSWORD="your_password"
+PCLOUD_FOLDER_ID="your_folder_id"
 
 ZABBIX_SERVER="10.10.10.10"
 HOSTNAME="Database-Master"
