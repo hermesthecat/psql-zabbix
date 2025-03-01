@@ -7,3 +7,6 @@ memory-bank/
 projectBrief.md
 .specstory/
 *.log
+*.exe
+output.txt
+code2prompt.bat
