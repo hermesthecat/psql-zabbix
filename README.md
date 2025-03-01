@@ -256,5 +256,4 @@ Bu proje MIT lisansı altında lisanslanmıştır. Detaylar için LICENSE dosyas
 
 ## 👥 İletişim
 - **Geliştirici**: A. Kerem Gök
-- **E-posta**: kerem@example.com
-- **GitHub**: github.com/username
+- **GitHub**: github.com/hermesthecat
