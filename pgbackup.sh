@@ -72,7 +72,7 @@ MDBNAMES="template1 $DBNAMES"
 DBEXCLUDE=""
 
 # Include CREATE DATABASE in backup?
-CREATE_DATABASE=yes
+CREATE_DATABASE=no
 
 # Separate backup directory and file for each DB? (yes or no)
 SEPDIR=yes
