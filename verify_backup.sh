@@ -229,6 +229,13 @@ main() {
     log_message "Yedek doğrulama süreci başarıyla tamamlandı"
     echo "Yedek doğrulama süreci başarıyla tamamlandı"
 
+    # CHECKSUM_DIR'deki tüm checksum dosyalarını tek tek pCloud'a yükle
+    for file in $CHECKSUM_DIR/*; do
+        echo "Yükleniyor: $file"
+        ./pcloud.sh "$file" "$PCLOUD_FOLDER_ID"
+        echo "Yüklendi: $file"
+    done
+
     rm -rf "$ZIP_DIR"/*
     rm -rf "$CHECKSUM_DIR"/*
 }
