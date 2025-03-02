@@ -18,12 +18,24 @@ source "$ENV_FILE"
 
 # pCloud kimlik doğrulama
 strAuth=$(curl -s --location --request GET "https://eapi.pcloud.com/userinfo?getauth=1&username=$PCLOUD_USERNAME&password=$PCLOUD_PASSWORD" | jq -r ".auth")
-echo $strAuth
 
-# pCloud kimlik doğrulama başarısızsa
+# Kimlik doğrulama başarısız olursa 5 kez tekrar dene
 if [ -z "$strAuth" ] || [ "$strAuth" == "null" ]; then
-    echo "HATA: pCloud kimlik doğrulama başarısız oldu!"
-    exit 1
+    echo "HATA: pCloud kimlik doğrulama başarısız oldu! 5 kez tekrar deneyeceğim..."
+    echo "HATA: pCloud kimlik doğrulama başarısız oldu! 5 kez tekrar deneyeceğim..." >> "$LOG_FILE"
+
+    for i in {1..5}; do
+        echo "Tekrar deneme: $i"
+
+        strAuth=$(curl -s --location --request GET "https://eapi.pcloud.com/userinfo?getauth=1&username=$PCLOUD_USERNAME&password=$PCLOUD_PASSWORD" | jq -r ".auth")
+
+        if [ -n "$strAuth" ] && [ "$strAuth" != "null" ]; then
+            echo "Başarılı: $i. deneme"
+            echo "Başarılı: $i. deneme" >> "$LOG_FILE"
+            break
+        fi
+    done
+   
 fi
 
 # pCloud'a dosya yükle
