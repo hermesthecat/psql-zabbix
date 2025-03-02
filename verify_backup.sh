@@ -55,8 +55,8 @@ test_backup_restore() {
     # 7zip arşivini geçici dizine aç
     7z x -p"$password" -o"$temp_dir" "$backup_file" >/dev/null 2>&1
     if [ $? -ne 0 ]; then
-        log_message "HATA: Yedek dosyası açılamadı"
-        echo "HATA: Yedek dosyası açılamadı"
+        log_message "HATA: $backup_file Yedek dosyası açılamadı"
+        echo "HATA: $backup_file Yedek dosyası açılamadı"
         rm -rf "$temp_dir"
         return 1
     fi
@@ -64,8 +64,8 @@ test_backup_restore() {
     # SQL dosyasını bul
     local sql_file=$(find "$temp_dir" -type f -name "*.sql" | head -n 1)
     if [ -z "$sql_file" ]; then
-        log_message "HATA: SQL dosyası bulunamadı"
-        echo "HATA: SQL dosyası bulunamadı"
+        log_message "HATA: $backup_file SQL dosyası bulunamadı"
+        echo "HATA: $backup_file SQL dosyası bulunamadı"
         rm -rf "$temp_dir"
         return 1
     fi
