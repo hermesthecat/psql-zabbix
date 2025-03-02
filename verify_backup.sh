@@ -235,7 +235,8 @@ main() {
         ./pcloud.sh "$file" "$PCLOUD_FOLDER_ID"
         echo "Yüklendi: $file"
     done
-    
+
+    rm -rf "$CHECKSUM_DIR"/*
 }
 
 # Script'i çalıştır

@@ -106,7 +106,7 @@ run_step "Uploading Backup" "./upload.sh"
 run_step "Verifying Backup" "./verify_backup.sh"
 
 # Tüm işlemler başarılı olduysa SQL ve ZIP dosyalarını temizle
-#cleanup_sql_files
+cleanup_sql_files
 cleanup_zip_files
 
 FINAL_MSG="$(date '+%Y-%m-%d %H:%M:%S') - SUCCESS: Backup process completed!"
