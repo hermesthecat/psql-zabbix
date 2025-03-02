@@ -193,8 +193,8 @@ main() {
     
     local backup_file=$(find_latest_backup)
     if [ -z "$backup_file" ]; then
-        log_message "HATA: Yedek dosyası bulunamadı!"
-        echo "HATA: Yedek dosyası bulunamadı!"
+        log_message "HATA: $backup_file Yedek dosyası bulunamadı!"
+        echo "HATA: $backup_file Yedek dosyası bulunamadı!"
         exit 1
     fi
     
@@ -202,8 +202,8 @@ main() {
     
     # Dosya bütünlüğü kontrolü
     if ! verify_backup_integrity "$backup_file"; then
-        log_message "HATA: Yedek dosyası bütünlük kontrolünden geçemedi!"
-        echo "HATA: Yedek dosyası bütünlük kontrolünden geçemedi!"
+        log_message "HATA: $backup_file Yedek dosyası bütünlük kontrolünden geçemedi!"
+        echo "HATA: $backup_file Yedek dosyası bütünlük kontrolünden geçemedi!"
         exit 1
     fi
     log_message "Dosya bütünlük kontrolü başarılı"
@@ -211,15 +211,15 @@ main() {
     
     # Checksum kontrolü
     if ! verify_checksums "$backup_file"; then
-        log_message "HATA: Checksum doğrulaması başarısız!"
-        echo "HATA: Checksum doğrulaması başarısız!"
+        log_message "HATA: $backup_file Checksum doğrulaması başarısız!"
+        echo "HATA: $backup_file Checksum doğrulaması başarısız!"
         exit 1
     fi
     
     # Test restore işlemi
     # if ! test_backup_restore "$backup_file"; then
-        log_message "HATA: Test restore işlemi başarısız!"
-        echo "HATA: Test restore işlemi başarısız!"
+        log_message "HATA: $backup_file Test restore işlemi başarısız!"
+        echo "HATA: $backup_file Test restore işlemi başarısız!"
         exit 1
     fi
     
