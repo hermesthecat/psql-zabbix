@@ -22,7 +22,6 @@ for file in $ZIP_DIR/*; do
     ./pcloud.sh "$file" "$PCLOUD_FOLDER_ID"
     echo "Yüklendi: $file"
 done
-rm -rf /home/zipbackup/*
 
 # CHECKSUM_DIR'deki tüm checksum dosyalarını tek tek pCloud'a yükle
 for file in $CHECKSUM_DIR/*; do
@@ -30,10 +29,3 @@ for file in $CHECKSUM_DIR/*; do
     ./pcloud.sh "$file" "$PCLOUD_FOLDER_ID"
     echo "Yüklendi: $file"
 done
-rm -rf /home/checksums/*
-
-
-
-
-
-

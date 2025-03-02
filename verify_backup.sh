@@ -227,6 +227,9 @@ main() {
     
     log_message "Yedek doğrulama süreci başarıyla tamamlandı"
     echo "Yedek doğrulama süreci başarıyla tamamlandı"
+
+    rm -rf "$ZIP_DIR"/*
+    rm -rf "$CHECKSUM_DIR"/*
 }
 
 # Script'i çalıştır
