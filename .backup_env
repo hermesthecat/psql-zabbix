@@ -14,3 +14,7 @@ CHECKSUM_DIR="${BACKUP_DIR}/checksums"
 ENCRYPTION_KEY_FILE="/root/.backup_encryption_key"
 
 ZIP_DIR="/home/zipbackup"
+
+PG_USERNAME="postgres"
+PG_PASSWORD="postgres"
+PG_HOST="localhost"

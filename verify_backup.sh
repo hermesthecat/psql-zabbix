@@ -71,16 +71,16 @@ test_backup_restore() {
     fi
     
     # Test veritabanı oluşturma
-    PGPASSWORD=$PGPASSWORD psql -h localhost -U postgres -c "DROP DATABASE IF EXISTS $TEST_DB_NAME;" >/dev/null 2>&1
-    PGPASSWORD=$PGPASSWORD psql -h localhost -U postgres -c "CREATE DATABASE $TEST_DB_NAME;" >/dev/null 2>&1
+    PGPASSWORD=$PG_PASSWORD psql -h $PG_HOST -U $PG_USERNAME -c "DROP DATABASE IF EXISTS $TEST_DB_NAME;" >/dev/null 2>&1
+    PGPASSWORD=$PG_PASSWORD psql -h $PG_HOST -U $PG_USERNAME -c "CREATE DATABASE $TEST_DB_NAME;" >/dev/null 2>&1
     
     if [ $? -eq 0 ]; then
         # Yedeği test veritabanına yükleme
-        PGPASSWORD=$PGPASSWORD psql -h localhost -U postgres -d "$TEST_DB_NAME" -f "$sql_file" >/dev/null 2>&1
+        PGPASSWORD=$PG_PASSWORD psql -h $PG_HOST -U $PG_USERNAME -d "$TEST_DB_NAME" -f "$sql_file" >/dev/null 2>&1
         if [ $? -eq 0 ]; then
             # Veritabanı boyutunu ve tablo sayısını kontrol etme
-            local db_size=$(PGPASSWORD=$PGPASSWORD psql -h localhost -U postgres -d "$TEST_DB_NAME" -t -c "SELECT pg_size_pretty(pg_database_size('$TEST_DB_NAME'));")
-            local table_count=$(PGPASSWORD=$PGPASSWORD psql -h localhost -U postgres -d "$TEST_DB_NAME" -t -c "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public';")
+            local db_size=$(PGPASSWORD=$PG_PASSWORD psql -h $PG_HOST -U $PG_USERNAME -d "$TEST_DB_NAME" -t -c "SELECT pg_size_pretty(pg_database_size('$TEST_DB_NAME'));")
+            local table_count=$(PGPASSWORD=$PG_PASSWORD psql -h $PG_HOST -U $PG_USERNAME -d "$TEST_DB_NAME" -t -c "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public';")
             
             log_message "Test restore başarılı! DB Boyutu: $db_size, Tablo Sayısı: $table_count"
             echo "Test restore başarılı! DB Boyutu: $db_size, Tablo Sayısı: $table_count"
@@ -95,7 +95,7 @@ test_backup_restore() {
     fi
     
     # Temizlik
-    PGPASSWORD=$PGPASSWORD psql -h localhost -U postgres -c "DROP DATABASE IF EXISTS $TEST_DB_NAME;" >/dev/null 2>&1
+    PGPASSWORD=$PG_PASSWORD psql -h $PG_HOST -U $PG_USERNAME -c "DROP DATABASE IF EXISTS $TEST_DB_NAME;" >/dev/null 2>&1
     rm -rf "$temp_dir"
     
     return $success
