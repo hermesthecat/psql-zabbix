@@ -16,6 +16,24 @@ rm -f "$LOG_FILE"
 # Env dosyasını yükle
 source "$ENV_FILE"
 
-cp /home/zipbackup/DB-Backup_All.tar.gz /home/zipbackup/DB-Backup_All.$(date +%y)$(date +%m)$(date +%d).tar.gz
-./pcloud.sh /home/zipbackup/DB-Backup_All.$(date +%y)$(date +%m)$(date +%d).tar.gz $PCLOUD_FOLDER_ID
-rm -rf /home/zipbackup/DB-Backup_All.*
+# ZIP_DIR'deki tüm 7z dosyalarını tek tek pCloud'a yükle
+for file in $ZIP_DIR/*; do
+    echo "Yükleniyor: $file"
+    ./pcloud.sh "$file" "$PCLOUD_FOLDER_ID"
+    echo "Yüklendi: $file"
+done
+rm -rf /home/zipbackup/*
+
+# CHECKSUM_DIR'deki tüm checksum dosyalarını tek tek pCloud'a yükle
+for file in $CHECKSUM_DIR/*; do
+    echo "Yükleniyor: $file"
+    ./pcloud.sh "$file" "$PCLOUD_FOLDER_ID"
+    echo "Yüklendi: $file"
+done
+rm -rf /home/checksums/*
+
+
+
+
+
+
