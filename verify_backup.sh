@@ -217,7 +217,7 @@ main() {
     fi
     
     # Test restore işlemi
-    # if ! test_backup_restore "$backup_file"; then
+    if ! test_backup_restore "$backup_file"; then
         log_message "HATA: $backup_file Test restore işlemi başarısız!"
         echo "HATA: $backup_file Test restore işlemi başarısız!"
         exit 1
