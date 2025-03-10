@@ -47,7 +47,7 @@ test_backup_restore() {
     local backup_file=$1
     local temp_dir=$(mktemp -d)
     local password=$(cat "$ENCRYPTION_KEY_FILE")
-    local success=0
+    local success=1  # Başlangıçta başarısız kabul et
     
     log_message "Test restore başlatılıyor: $backup_file"
     echo "Test restore başlatılıyor: $backup_file"
@@ -84,7 +84,7 @@ test_backup_restore() {
             
             log_message "Test restore başarılı! DB Boyutu: $db_size, Tablo Sayısı: $table_count"
             echo "Test restore başarılı! DB Boyutu: $db_size, Tablo Sayısı: $table_count"
-            success=1
+            success=0  # Başarılı durumda 0 dön
         else
             log_message "HATA: Test restore başarısız - SQL yükleme hatası"
             echo "HATA: Test restore başarısız - SQL yükleme hatası"
