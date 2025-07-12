@@ -1,0 +1,20 @@
+# PostgreSQL Configuration for Incremental Backup
+# Bu ayarları postgresql.conf dosyasına ekleyin
+
+# WAL Archiving etkinleştir
+wal_level = replica
+archive_mode = on
+archive_command = '/path/to/psql-zabbix/wal_archive.sh %p %f'
+
+# WAL dosya boyutu ve retention
+max_wal_size = 1GB
+min_wal_size = 80MB
+wal_keep_segments = 32
+
+# Checkpoint ayarları
+checkpoint_completion_target = 0.7
+checkpoint_timeout = 5min
+
+# Replication ayarları (isteğe bağlı)
+max_wal_senders = 3
+wal_sender_timeout = 60s 
